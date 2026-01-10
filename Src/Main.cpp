@@ -21,9 +21,11 @@ DWORD MainThread(HMODULE Module)
 
     // Just took a random ExecuteUbergraph
     auto Func = UObject::FindFunction(L"/Game/Athena/SupplyDrops/BP_DamageBalloon_Athena.BP_DamageBalloon_Athena_C:ExecuteUbergraph_BP_DamageBalloon_Athena");
+    auto Class = UObject::FindClass(L"/Game/Athena/SupplyDrops/BP_DamageBalloon_Athena.BP_DamageBalloon_Athena_C");
 
     std::ofstream outfile("script.txt");
-    outfile << KismetDisassembler(Func).Disassemble();
+    // outfile << KismetDisassembler().Disassemble(Func);
+    outfile << KismetDisassembler().Disassemble(Class);
     outfile.close();
 
     return 0;

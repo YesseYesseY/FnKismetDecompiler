@@ -145,51 +145,56 @@ private:
     TArray<uint8> Script;
     std::string Out;
     int32 IndentCount = 0;
+    int32 ScriptIndex = 0;
 
 public:
-    KismetDisassembler(UFunction* Function)
+    KismetDisassembler()
     {
-        Script = Function->GetScript();
         Out = "";
     }
 
     template <typename T>
-    T ReadBasic(int32& ScriptIndex)
+    T ReadBasic()
     {
         T ret = *(T*)(&Script[ScriptIndex]);
         ScriptIndex += sizeof(T);
         return ret;
     }
 
-    int32 ReadInt32(int32& ScriptIndex)
+    int32 ReadInt32()
     {
-        return ReadBasic<int32>(ScriptIndex);
+        return ReadBasic<int32>();
     }
 
-    uint64 ReadUInt64(int32& ScriptIndex)
+    uint64 ReadUInt64()
     {
-        return ReadBasic<uint64>(ScriptIndex);
+        return ReadBasic<uint64>();
     }
 
     template <typename T>
-    T* ReadPtr(int32& ScriptIndex)
+    T* ReadPtr()
     {
-        return ReadBasic<T*>(ScriptIndex);
+        return ReadBasic<T*>();
     }
 
-    float ReadFloat(int32& ScriptIndex)
+    float ReadFloat()
     {
-        return ReadBasic<float>(ScriptIndex);
+        return ReadBasic<float>();
     }
 
-    std::string ReadName(int32& ScriptIndex)
+    uint8 ReadUInt8()
+    {
+        return ReadBasic<uint8>();
+    }
+
+    std::string ReadName()
     {
         auto ret = ((FScriptName*)(&Script[ScriptIndex]))->ToString();
         ScriptIndex += sizeof(FScriptName);
         return ret;
     }
 
-    std::string ReadString(int32& ScriptIndex)
+    std::string ReadString()
     {
         auto ret = std::string((const char*)(&Script[ScriptIndex]));
         ScriptIndex += ret.size() + 1;
@@ -216,7 +221,7 @@ public:
 
 #define OutLine(...) { Indent(); Out += std::format(__VA_ARGS__) + '\n'; };
 
-    EExprToken ProcessToken(int32& ScriptIndex)
+    EExprToken ProcessToken()
     {
         EExprToken Token = (EExprToken)Script[ScriptIndex++];
         std::println("0x{:X}", (uint8)Token);
@@ -224,7 +229,7 @@ public:
         {
             case EX_PushExecutionFlow:
             {
-                auto Skip = ReadInt32(ScriptIndex);
+                auto Skip = ReadInt32();
                 OutLine("EX_PushExecutionFlow ({})", Skip);
                 break;
             }
@@ -233,14 +238,14 @@ public:
                 OutLine("EX_ComputedJump");
 
                 AddIndent();
-                ProcessToken(ScriptIndex);
+                ProcessToken();
                 DropIndent();
 
                 break;
             }
             case EX_LocalVariable:
             {
-                auto Prop = ReadPtr<UProperty>(ScriptIndex);
+                auto Prop = ReadPtr<UProperty>();
 
                 OutLine("EX_LocalVariable ({})", Prop->GetFullName());
 
@@ -248,12 +253,12 @@ public:
             }
             case EX_FinalFunction:
             {
-                auto Func = ReadPtr<UStruct>(ScriptIndex);
+                auto Func = ReadPtr<UStruct>();
 
                 OutLine("EX_FinalFunction ({})", Func ? Func->GetFullName() : "Null");
 
                 AddIndent();
-                while (ProcessToken(ScriptIndex) != EX_EndFunctionParms) { }
+                while (ProcessToken() != EX_EndFunctionParms) { }
                 DropIndent();
 
                 break;
@@ -263,23 +268,9 @@ public:
                 OutLine("EX_EndFunctionParms");
                 break;
             }
-            case EX_LetBool:
-            {
-                OutLine("EX_LetBool");
-
-                AddIndent();
-                OutLine("// Var");
-                ProcessToken(ScriptIndex);
-                OutLine("");
-                OutLine("// Exp");
-                ProcessToken(ScriptIndex);
-                DropIndent();
-
-                break;
-            }
             case EX_InstanceVariable:
             {
-                auto Prop = ReadPtr<UProperty>(ScriptIndex);
+                auto Prop = ReadPtr<UProperty>();
 
                 OutLine("EX_InstanceVariable ({})", Prop->GetFullName());
                 break;
@@ -296,21 +287,21 @@ public:
             }
             case EX_CallMulticastDelegate:
             {
-                auto Func = ReadPtr<UStruct>(ScriptIndex);
+                auto Func = ReadPtr<UStruct>();
                 OutLine("EX_CallMulticastDelegate ({})", Func->GetFullName());
 
                 AddIndent();
-                while (ProcessToken(ScriptIndex) != EX_EndFunctionParms) {  }
+                while (ProcessToken() != EX_EndFunctionParms) {  }
                 DropIndent();
 
                 break;
             }
             case EX_VirtualFunction:
             {
-                OutLine("EX_VirtualFunction ({})", ReadName(ScriptIndex));
+                OutLine("EX_VirtualFunction ({})", ReadName());
 
                 AddIndent();
-                while (ProcessToken(ScriptIndex) != EX_EndFunctionParms) { }
+                while (ProcessToken() != EX_EndFunctionParms) { }
                 DropIndent();
                 break;
             }
@@ -324,7 +315,7 @@ public:
                 OutLine("EX_PopExecutionFlowIfNot");
 
                 AddIndent();
-                ProcessToken(ScriptIndex);
+                ProcessToken();
                 DropIndent();
                 break;
             }
@@ -344,21 +335,21 @@ public:
 ContextLogic:
                 AddIndent();
                 OutLine("// Object");
-                ProcessToken(ScriptIndex);
-                OutLine("// Skip ({})\n", ReadInt32(ScriptIndex));
+                ProcessToken();
+                OutLine("// Skip ({})\n", ReadInt32());
 
-                auto Field = ReadPtr<UField>(ScriptIndex);
+                auto Field = ReadPtr<UField>();
                 OutLine("// Thing ({})\n", Field ? Field->GetFullName() : "Null");
 
                 OutLine("// Thing2");
-                ProcessToken(ScriptIndex);
+                ProcessToken();
                 DropIndent();
 
                 break;
             }
             case EX_ObjectConst:
             {
-                auto Object = ReadPtr<UObject>(ScriptIndex);
+                auto Object = ReadPtr<UObject>();
                 OutLine("EX_ObjectConst ({})", Object->GetFullName());
                 break;
             }
@@ -385,51 +376,64 @@ ContextLogic:
             }
             case EX_StringConst:
             {
-                auto Str = ReadString(ScriptIndex);
+                auto Str = ReadString();
                 OutLine("EX_StringConst (\"{}\")", Str);
                 break;
             }
+            case EX_LetObj:
+            {
+                OutLine("EX_LetObj");
+                goto LetLogic;
+            }
+            case EX_LetBool:
+            {
+                OutLine("EX_LetBool");
+                goto LetLogic;
+            }
             case EX_Let:
             {
-                auto Prop = ReadPtr<UProperty>(ScriptIndex);
-                OutLine("EX_Let ({})", Prop->GetFullName());
+                {
+                    auto Prop = ReadPtr<UProperty>();
+                    OutLine("EX_Let ({})", Prop->GetFullName());
+                }
 
+LetLogic:
                 AddIndent();
                 OutLine("// Var");
-                ProcessToken(ScriptIndex);
+                ProcessToken();
                 OutLine("// Expr");
-                ProcessToken(ScriptIndex);
+                ProcessToken();
                 DropIndent();
                 break;
             }
             case EX_CallMath:
             {
-                auto Func = ReadPtr<UStruct>(ScriptIndex);
+                auto Func = ReadPtr<UStruct>();
                 OutLine("EX_CallMath ({})", Func->GetFullName());
 
                 AddIndent();
-                while (ProcessToken(ScriptIndex) != EX_EndFunctionParms) {  }
+                while (ProcessToken() != EX_EndFunctionParms) {  }
                 DropIndent();
                 break;
             }
             case EX_FloatConst:
             {
-                auto Float = ReadFloat(ScriptIndex);
+                auto Float = ReadFloat();
                 OutLine("EX_FloatConst ({}f)", Float);
                 break;
             }
             case EX_Jump:
             {
-                auto Skip = ReadInt32(ScriptIndex);
+                auto Skip = ReadInt32();
                 OutLine("EX_Jump ({})", Skip);
                 break;
             }
             case EX_JumpIfNot:
             {
-                auto Skip = ReadInt32(ScriptIndex);
+                auto Skip = ReadInt32();
                 OutLine("EX_JumpIfNot ({})", Skip);
                 AddIndent();
-                ProcessToken(ScriptIndex);
+                ProcessToken();
                 DropIndent();
                 break;
             }
@@ -437,7 +441,7 @@ ContextLogic:
             {
                 OutLine("EX_Return");
                 AddIndent();
-                ProcessToken(ScriptIndex);
+                ProcessToken();
                 DropIndent();
                 break;
             }
@@ -451,6 +455,50 @@ ContextLogic:
                 OutLine("EX_EndOfScript");
                 break;
             }
+            case EX_NameConst:
+            {
+                auto Name = ReadName();
+                OutLine("EX_NameConst ({})", Name);
+                break;
+            }
+            case EX_RotationConst:
+            {
+                OutLine("EX_RotationConst ({}, {}, {})", ReadFloat(), ReadFloat(), ReadFloat());
+                break;
+            }
+            case EX_VectorConst:
+            {
+                OutLine("EX_VectorConst ({}, {}, {})", ReadFloat(), ReadFloat(), ReadFloat());
+                break;
+            }
+            case EX_ByteConst:
+            {
+                OutLine("EX_ByteConst ({})", ReadUInt8());
+                break;
+            }
+            case EX_IntConst:
+            {
+                OutLine("EX_IntConst ({})", ReadInt32());
+                break;
+            }
+            case EX_LocalOutVariable:
+            {
+                OutLine("EX_LocalOutVariable ({})", ReadPtr<UProperty>()->GetFullName());
+                break;
+            }
+            case EX_LetValueOnPersistentFrame:
+            {
+                OutLine("EX_LetValueOnPersistentFrame");
+
+                AddIndent();
+                OutLine("// Var ({})", ReadPtr<UProperty>()->GetFullName());
+                OutLine("");
+                OutLine("// Expr");
+                ProcessToken();
+                DropIndent();
+
+                break;
+            }
             default:
             {
                 OutLine("Unknown: 0x{:02X}", (uint8)Token);
@@ -462,16 +510,37 @@ ContextLogic:
         return Token;
     }
 
-    std::string Disassemble()
+    std::string Disassemble(UFunction* Function)
     {
-        int32 ScriptIndex = 0;
-        OutLine("Size: {}", Script.Num());
+        Script = Function->GetScript();
+        OutLine("// Script Size: {}", Script.Num());
+        OutLine("void {}()", Function->GetName());
+        OutLine("{{");
+        AddIndent();
+        ScriptIndex = 0;
         while (ScriptIndex < Script.Num())
         {
             OutLine("Label_{}", ScriptIndex);
-            ProcessToken(ScriptIndex);
+            ProcessToken();
             OutLine("");
         }
+        DropIndent();
+        OutLine("}}");
+        return Out;
+    }
+
+    std::string Disassemble(UClass* Class)
+    {
+        for (auto Child = Class->GetChildren(); Child; Child = Child->GetNext())
+        {
+            static auto FunctionClass = UObject::FindClass(L"/Script/CoreUObject.Function");
+            if (!Child->IsA(FunctionClass)) continue;
+
+            auto Func = (UFunction*)Child;
+            Disassemble(Func);
+            OutLine("");
+        }
+
         return Out;
     }
 };
