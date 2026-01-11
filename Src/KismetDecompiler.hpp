@@ -123,7 +123,7 @@ public:
         }
     }
 
-    EExprToken ProcessToken()
+    EExprToken ProcessToken(bool CalledFromContext = false)
     {
         EExprToken Token = (EExprToken)Script[ScriptIndex++];
         std::println("0x{:X}", (uint8)Token);
@@ -142,21 +142,23 @@ public:
 
                 break;
             }
+            case EX_LocalOutVariable:
+            case EX_InstanceVariable:
             case EX_LocalVariable:
             {
                 auto Prop = ReadPtr<UProperty>();
 
                 Out += Prop->GetName();
-                // OutLine("EX_LocalVariable ({})", Prop->GetFullName());
 
                 break;
             }
+            case EX_CallMath:
             case EX_FinalFunction:
             {
                 auto Func = ReadPtr<UFunction>();
 
-                // OutLine("EX_FinalFunction ({})", Func ? Func->GetFullName() : "Null");
-
+                if (!CalledFromContext && Func->HasFunctionFlag(EFunctionFlags::FUNC_Static))
+                    Out += std::format("{}::", Func->GetOuter()->GetCPPName());
                 Out += std::format("{}(", Func->GetName());
                 ArgsLoop();
                 Out += ")";
@@ -166,13 +168,6 @@ public:
             case EX_EndFunctionParms:
             {
                 // OutLine("EX_EndFunctionParms");
-                break;
-            }
-            case EX_InstanceVariable:
-            {
-                auto Prop = ReadPtr<UProperty>();
-
-                OutLine("EX_InstanceVariable ({})", Prop->GetFullName());
                 break;
             }
             case EX_False:
@@ -226,7 +221,7 @@ public:
                 auto Skip = ReadInt32();
                 auto Field = ReadPtr<UField>();
 
-                ProcessToken();
+                ProcessToken(true);
 
                 break;
             }
@@ -255,8 +250,7 @@ public:
             }
             case EX_StringConst:
             {
-                auto Str = ReadString8();
-                OutLine("EX_StringConst (\"{}\")", Str);
+                Out += std::format("FString(\"{}\")", ReadString8());
                 break;
             }
             case EX_LetWeakObjPtr:
@@ -272,29 +266,12 @@ LetLogic:
             case EX_Let:
             {
                 auto Prop = ReadPtr<UProperty>();
-                OutLine("EX_Let ({})", Prop->GetFullName());
-                AddIndent();
-                OutLine("// Var");
-                ProcessToken();
-                OutLine("// Expr");
-                ProcessToken();
-                DropIndent();
-                // Indent();
-                // Out += std::format("{} = ", Prop->GetName());
-            }
-            case EX_CallMath:
-            {
-                auto Func = ReadPtr<UStruct>();
-                OutLine("EX_CallMath ({})", Func->GetFullName());
-
-                AddIndent();
-                while (ProcessToken() != EX_EndFunctionParms) {  }
-                DropIndent();
-                break;
+                // OutLine("EX_Let ({})", Prop->GetFullName());
+                goto LetLogic;
             }
             case EX_FloatConst:
             {
-                Out += std::format("{}f", ReadFloat());
+                Out += std::format("{:#.0f}f", ReadFloat());
                 break;
             }
             case EX_Jump:
@@ -336,69 +313,50 @@ LetLogic:
             }
             case EX_RotationConst:
             {
-                OutLine("EX_RotationConst ({}, {}, {})", ReadFloat(), ReadFloat(), ReadFloat());
+                Out += std::format("FRotator({:#.0f}f, {:#.0f}f, {:#.0f})f", ReadFloat(), ReadFloat(), ReadFloat());
                 break;
             }
             case EX_VectorConst:
             {
-                OutLine("EX_VectorConst ({}, {}, {})", ReadFloat(), ReadFloat(), ReadFloat());
+                Out += std::format("FVector({:#.0f}f, {:#.0f}f, {:#.0f})f", ReadFloat(), ReadFloat(), ReadFloat());
                 break;
             }
             case EX_ByteConst:
             {
-                OutLine("EX_ByteConst ({})", ReadUInt8());
+                Out += std::format("(uint8){}", ReadUInt8());
                 break;
             }
             case EX_IntConst:
             {
                 Out += std::format("(int32){}", ReadInt32());
-                // OutLine("EX_IntConst ({})", ReadInt32());
-                break;
-            }
-            case EX_LocalOutVariable:
-            {
-                Out += std::format("{}", ReadPtr<UProperty>()->GetName());
-                // OutLine("EX_LocalOutVariable ({})", ReadPtr<UProperty>()->GetFullName());
                 break;
             }
             case EX_LetValueOnPersistentFrame:
             {
-                OutLine("EX_LetValueOnPersistentFrame");
-
-                AddIndent();
-                OutLine("// Var ({})", ReadPtr<UProperty>()->GetFullName());
-                OutLine("");
-                OutLine("// Expr");
+                Out += std::format("{} = ", ReadPtr<UProperty>()->GetName());
                 ProcessToken();
-                DropIndent();
 
                 break;
             }
-            case EX_SwitchValue:
+            case EX_SwitchValue: // TODO Figure out a better way for this
             {
                 auto Num = ReadUInt16();
                 auto Skip = ReadInt32();
-                OutLine("EX_SwitchValue (Num: {}) (Skip: {})", Num, Skip);
-
-                AddIndent();
-                OutLine("// Index");
+                Out += "switch (";
                 ProcessToken();
-                OutLine("");
-
+                Out += ") { ";
                 for (uint16 i = 0; i < Num; i++)
                 {
-                    OutLine("// Case {}", i);
+                    Out += "case ";
                     ProcessToken();
-                    auto Next = ReadInt32();
-                    OutLine("// Next {}", Next);
-                    OutLine("");
+                    Out += ": ";
+                    ReadInt32();
                     ProcessToken();
+                    Out += "; ";
                 }
-                OutLine("");
-                OutLine("// Default");
-
+                Out += "default: ";
                 ProcessToken();
-                DropIndent();
+                Out += "; }";
                 break;
             }
             case EX_NoObject:
@@ -408,19 +366,24 @@ LetLogic:
             }
             case EX_StructMemberContext:
             {
-                OutLine("EX_StructMemberContext");
-
-                AddIndent();
-                OutLine("// Var ({})", ReadPtr<UProperty>()->GetFullName());
-                OutLine("");
-                OutLine("// Expr");
+                auto Prop = ReadPtr<UProperty>();
                 ProcessToken();
-                DropIndent();
+                Out += std::format(".{}", Prop->GetName());
+                // OutLine("EX_StructMemberContext");
+
+                // AddIndent();
+                // OutLine("// Var ({})", ReadPtr<UProperty>()->GetFullName());
+                // OutLine("");
+                // OutLine("// Expr");
+                // ProcessToken();
+                // DropIndent();
                 break;
             }
             case EX_ObjToInterfaceCast:
             {
-                OutLine("EX_ObjToInterfaceCast ({})", ReadPtr<UClass>()->GetFullName());
+                Out += std::format("GetInterface<I{}>(", ReadPtr<UClass>()->GetName());
+                ProcessToken();
+                Out += ')';
                 break;
             }
             case EX_ArrayConst:
@@ -439,11 +402,15 @@ LetLogic:
             }
             case EX_TransformConst:
             {
-                OutLine("EX_TransformConst Rot ({}, {}, {}, {}), Pos ({}, {}, {}), Size ({}, {}, {})",
-                        ReadFloat(), ReadFloat(), ReadFloat(), ReadFloat(),
+                Out += std::format("FTransform(FVector({:#.0f}f, {:#.0f}f, {:#.0f}f), FQuat({:#.0f}f, {:#.0f}f, {:#.0f}f, {:#.0f}f), FVector({:#.0f}f, {:#.0f}f, {:#.0f}f))",
                         ReadFloat(), ReadFloat(), ReadFloat(),
-                        ReadFloat(), ReadFloat(), ReadFloat()
-                        );
+                        ReadFloat(), ReadFloat(), ReadFloat(), ReadFloat(),
+                        ReadFloat(), ReadFloat(), ReadFloat());
+                // OutLine("EX_TransformConst Rot ({}, {}, {}, {}), Pos ({}, {}, {}), Size ({}, {}, {})",
+                //         ReadFloat(), ReadFloat(), ReadFloat(), ReadFloat(),
+                //         ReadFloat(), ReadFloat(), ReadFloat(),
+                //         ReadFloat(), ReadFloat(), ReadFloat()
+                //         );
                 break;
             }
             case EX_SkipOffsetConst:
@@ -453,24 +420,25 @@ LetLogic:
             }
             case EX_DynamicCast:
             {
-                OutLine("EX_DynamicCast ({})", ReadPtr<UClass>()->GetFullName());
+                Out += std::format("Cast<{}>(", ReadPtr<UClass>()->GetCPPName());
+                ProcessToken();
+                Out += ')';
                 break;
             }
-            case EX_PrimitiveCast:
+            case EX_PrimitiveCast: // TODO
             {
-                OutLine("EX_PrimitiveCast ({})", ReadUInt8());
-                AddIndent();
+                Out += std::format("PrimitiveCast({}, ", ReadUInt8());
                 ProcessToken();
-                DropIndent();
+                Out += ')';
                 break;
             }
             case EX_InterfaceContext:
             {
-                OutLine("EX_InterfaceContext");
-                
-                AddIndent();
+                // OutLine("EX_InterfaceContext");
+                // 
+                // AddIndent();
                 ProcessToken();
-                DropIndent();
+                // DropIndent();
                 break;
             }
             case EX_SetArray:

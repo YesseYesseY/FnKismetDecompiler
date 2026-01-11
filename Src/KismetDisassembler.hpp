@@ -63,6 +63,7 @@ enum EExprToken
     EX_UInt64Const               = 0x36,
     EX_DoubleConst               = 0x37, // 5.0 // There was no DoubleConst until 5.0?????????????????
     EX_PrimitiveCast             = 0x38,
+    EX_Cast                      = 0x38, // 5.0 Renamed EX_PrimitiveCast to EX_Cast
     EX_SetSet                    = 0x39,
     EX_EndSet                    = 0x3A,
     EX_SetMap                    = 0x3B,
@@ -588,6 +589,9 @@ LetLogic:
             case EX_ObjToInterfaceCast:
             {
                 OutLine("EX_ObjToInterfaceCast ({})", ReadPtr<UClass>()->GetFullName());
+                AddIndent();
+                ProcessToken();
+                DropIndent();
                 break;
             }
             case EX_ArrayConst:
@@ -621,6 +625,9 @@ LetLogic:
             case EX_DynamicCast:
             {
                 OutLine("EX_DynamicCast ({})", ReadPtr<UClass>()->GetFullName());
+                AddIndent();
+                ProcessToken();
+                DropIndent();
                 break;
             }
             case EX_PrimitiveCast:

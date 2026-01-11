@@ -63,13 +63,14 @@ DWORD MainThread(HMODULE Module)
         }
     }
 #else
-    auto Class = UObject::FindClass(L"/Game/Athena/Athena_PlayerController.Athena_PlayerController_C");
+    // auto Class = UObject::FindClass(L"/Game/Athena/Athena_PlayerController.Athena_PlayerController_C");
+    auto Class = UObject::FindClass(L"/Game/Athena/PlayerPawn_Athena.PlayerPawn_Athena_C");
 #if 0 // Disassemble or Decompile
     std::ofstream outfile("scripts/" + Class->GetName() + ".txt");
     outfile << KismetDisassembler().Disassemble(Class);
     outfile.close();
 #else
-    std::ofstream outfile("decomp/" + Class->GetName() + ".txt");
+    std::ofstream outfile("decomp/" + Class->GetName() + ".cpp");
     outfile << KismetDecompiler().Disassemble(Class);
     outfile.close();
 

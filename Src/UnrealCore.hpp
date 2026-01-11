@@ -14,6 +14,7 @@ namespace UnrealCore
         static int32 UObject_NamePrivate = -1;
         static int32 UObject_Class = -1;
         static int32 UObject_ObjectFlags = -1;
+        static int32 UObject_Outer = -1;
 
         static int32 UField_Next = -1;
 
@@ -25,6 +26,7 @@ namespace UnrealCore
         static int32 UProperty_Offset = -1;
 
         static int32 UFunction_ExecFunc = -1;
+        static int32 UFunction_FunctionFlags = -1;
     }
 
     namespace UnrealOptions
@@ -263,6 +265,11 @@ namespace UnrealCore
             return GetChild<class UClass*>(Offsets::UObject_Class);
         }
 
+        UObject* GetOuter()
+        {
+            return GetChild<UObject*>(Offsets::UObject_Outer);
+        }
+
         EObjectFlags GetObjectFlags()
         {
             return GetChild<EObjectFlags>(Offsets::UObject_ObjectFlags);
@@ -443,6 +450,16 @@ namespace UnrealCore
         {
             return GetChild<void*>(Offsets::UFunction_ExecFunc);
         }
+
+        EFunctionFlags GetFunctionFlags()
+        {
+            return GetChild<EFunctionFlags>(Offsets::UFunction_FunctionFlags);
+        }
+
+        bool HasFunctionFlag(EFunctionFlags Flag)
+        {
+            return (GetFunctionFlags() & Flag) != EFunctionFlags::FUNC_None;
+        }
     };
 
     std::string FName::ToString()
@@ -503,12 +520,16 @@ namespace UnrealCore
         if (!this)
             return "None";
 
-        // TODO
-        char Base = 'U';
-        static auto ScriptStructClass = UObject::FindClass(L"/Script/CoreUObject.ScriptStruct");
+        // TODO I probably can move this to UClass
+        char Base = 'F';
         static auto ActorClass = UObject::FindClass(L"/Script/Engine.Actor");
-        if (IsA(ScriptStructClass)) Base = 'F';
-        else if (IsA(ActorClass)) Base = 'A';
+        static auto ClassClass = UObject::FindClass(L"/Script/CoreUObject.Class");
+        if (IsA(ClassClass))
+        {
+            auto Class = (UClass*)this;
+            if (Class->IsChildOf(ActorClass)) Base = 'A';
+            else Base = 'U';
+        }
         return Base + GetName();
     }
 
@@ -645,9 +666,12 @@ namespace UnrealCore
             GameVersion = std::stof(VerStr.substr(VerStr.find_last_of('-') + 1));
         }
 
+        UnrealOptions::ChunkedObjectArray = EngineVersion >= 4.22f; // TODO Check 4.21
+
         Offsets::UObject_ObjectFlags = 0x8;
         Offsets::UObject_Class = 0x10;
         Offsets::UObject_NamePrivate = 0x18;
+        Offsets::UObject_Outer = 0x20;
 
         Offsets::UField_Next = 0x28;
 
@@ -661,10 +685,12 @@ namespace UnrealCore
 
         Offsets::UProperty_Offset = 0x44;
 
+        auto StructClass = UObject::FindClass(L"/Script/CoreUObject.Struct");
+        Offsets::UFunction_FunctionFlags = StructClass->GetSize();
+
         Offsets::UFunction_ExecFunc = 0xB0;
         if (EngineVersion >= 4.22f) // From UStruct
             Offsets::UFunction_ExecFunc += 0x10;
 
-        UnrealOptions::ChunkedObjectArray = EngineVersion >= 4.22f; // TODO Check 4.21
     }
 }
