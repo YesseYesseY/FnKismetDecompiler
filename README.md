@@ -2,7 +2,8 @@
 Kismet decompiler for fortnite
 
 # Unreal Version Support
- - UE4.20 = In Progress
+ - UE4.20
+   - 4.1 = Disassembler working, Decompiler in development
  - Everything else = Not tested
 
 # Goal

@@ -307,7 +307,9 @@ namespace UnrealCore
             return HasObjectFlag(EObjectFlags::RF_ClassDefaultObject);
         }
 
+        std::string GetPathName();
         std::string GetFullName();
+        std::string GetCPPName();
 
         bool IsA(class UClass* Other);
     };
@@ -323,11 +325,37 @@ namespace UnrealCore
 
     class UProperty : public UField
     {
+    private:
+        static inline int32 GetCPPTypeIndex = -1;
     public:
+        static void Init()
+        {
+            // UProperty::GetCPPType
+            {
+                auto BaseFunc = Memcury::Scanner::FindStringRef(L"UProperty::GetCPPType").ScanFor({ 0x48, 0x89, 0x5C }, false).GetAs<void*>();
+                auto UPropertyVTable = UObject::FindObject(L"/Script/CoreUObject.Default__Property")->VTable;
+
+                for (int i = 0; i < 0x100; i++)
+                {
+                    if (UPropertyVTable[i] == BaseFunc)
+                    {
+                        GetCPPTypeIndex = i;
+                        break;
+                    }
+                }
+            }
+        }
+
         int32 GetOffset()
         {
             return GetChild<int32>(Offsets::UProperty_Offset);
         }
+
+        std::string GetCPPType();
+    };
+
+    class UEnum : public UField
+    {
     };
 
     class UStruct : public UField
@@ -445,7 +473,7 @@ namespace UnrealCore
         return ret;
     }
 
-    std::string UObject::GetFullName()
+    std::string UObject::GetPathName()
     {
         if (!this)
             return "None";
@@ -457,9 +485,31 @@ namespace UnrealCore
             FString ReturnValue;
         } args { this };
         StringLib->ProcessEvent(Func, &args);
-        auto ret = std::format("{} {}", GetClass()->GetName(), args.ReturnValue.ToString());
+        auto ret = args.ReturnValue.ToString();
         args.ReturnValue.Free();
         return ret;
+    }
+
+    std::string UObject::GetFullName()
+    {
+        if (!this)
+            return "None";
+
+        return std::format("{} {}", GetClass()->GetName(), GetPathName());
+    }
+
+    std::string UObject::GetCPPName()
+    {
+        if (!this)
+            return "None";
+
+        // TODO
+        char Base = 'U';
+        static auto ScriptStructClass = UObject::FindClass(L"/Script/CoreUObject.ScriptStruct");
+        static auto ActorClass = UObject::FindClass(L"/Script/Engine.Actor");
+        if (IsA(ScriptStructClass)) Base = 'F';
+        else if (IsA(ActorClass)) Base = 'A';
+        return Base + GetName();
     }
 
     bool UObject::IsA(class UClass* Other)
@@ -495,11 +545,80 @@ namespace UnrealCore
         return GetClass()->GetChildFunction(Name);
     }
 
+    std::string UProperty::GetCPPType()
+    {
+        /*TODO*/ static auto EnumPropertyClass = UObject::FindClass(L"/Script/CoreUObject.EnumProperty");
+        /*TODO*/ static auto ArrayPropertyClass = UObject::FindClass(L"/Script/CoreUObject.ArrayProperty");
+        /*TODO*/ static auto ObjectPropertyBaseClass = UObject::FindClass(L"/Script/CoreUObject.ObjectPropertyBase");
+        static auto BoolPropertyClass = UObject::FindClass(L"/Script/CoreUObject.BoolProperty");
+        static auto BytePropertyClass = UObject::FindClass(L"/Script/CoreUObject.ByteProperty");
+        /*TODO*/ static auto ObjectPropertyClass = UObject::FindClass(L"/Script/CoreUObject.ObjectProperty");
+        /*TODO*/ static auto ClassPropertyClass = UObject::FindClass(L"/Script/CoreUObject.ClassProperty");
+        /*TODO*/ static auto DelegatePropertyClass = UObject::FindClass(L"/Script/CoreUObject.DelegateProperty");
+        static auto DoublePropertyClass = UObject::FindClass(L"/Script/CoreUObject.DoubleProperty");
+        static auto FloatPropertyClass = UObject::FindClass(L"/Script/CoreUObject.FloatProperty");
+        static auto IntPropertyClass = UObject::FindClass(L"/Script/CoreUObject.IntProperty");
+        static auto Int16PropertyClass = UObject::FindClass(L"/Script/CoreUObject.Int16Property");
+        static auto Int64PropertyClass = UObject::FindClass(L"/Script/CoreUObject.Int64Property");
+        static auto Int8PropertyClass = UObject::FindClass(L"/Script/CoreUObject.Int8Property");
+        /*TODO*/ static auto InterfacePropertyClass = UObject::FindClass(L"/Script/CoreUObject.InterfaceProperty");
+        /*TODO*/ static auto LazyObjectPropertyClass = UObject::FindClass(L"/Script/CoreUObject.LazyObjectProperty");
+        /*TODO*/ static auto MapPropertyClass = UObject::FindClass(L"/Script/CoreUObject.MapProperty");
+        /*TODO*/ static auto MulticastDelegatePropertyClass = UObject::FindClass(L"/Script/CoreUObject.MulticastDelegateProperty");
+        /*TODO*/ static auto NamePropertyClass = UObject::FindClass(L"/Script/CoreUObject.NameProperty");
+        /*TODO*/ static auto SetPropertyClass = UObject::FindClass(L"/Script/CoreUObject.SetProperty");
+        /*TODO*/ static auto SoftObjectPropertyClass = UObject::FindClass(L"/Script/CoreUObject.SoftObjectProperty");
+        /*TODO*/ static auto SoftClassPropertyClass = UObject::FindClass(L"/Script/CoreUObject.SoftClassProperty");
+        /*TODO*/ static auto StrPropertyClass = UObject::FindClass(L"/Script/CoreUObject.StrProperty");
+        /*TODO*/ static auto StructPropertyClass = UObject::FindClass(L"/Script/CoreUObject.StructProperty");
+        static auto UInt16PropertyClass = UObject::FindClass(L"/Script/CoreUObject.UInt16Property");
+        static auto UInt32PropertyClass = UObject::FindClass(L"/Script/CoreUObject.UInt32Property");
+        static auto UInt64PropertyClass = UObject::FindClass(L"/Script/CoreUObject.UInt64Property");
+        /*TODO*/ static auto WeakObjectPropertyClass = UObject::FindClass(L"/Script/CoreUObject.WeakObjectProperty");
+        /*TODO*/ static auto TextPropertyClass = UObject::FindClass(L"/Script/CoreUObject.TextProperty");
+
+        static auto BasePropertySize = UObject::FindClass(L"/Script/CoreUObject.Property")->GetSize();
+
+        auto Class = GetClass();
+        if (Class == BoolPropertyClass)
+        {
+            auto FieldMask = GetChild<uint8>(BasePropertySize + 3);
+            bool IsNativeBool = FieldMask == 0xFF;
+            if (IsNativeBool)
+            {
+                return "bool";
+            }
+
+            // TODO
+            return "bool /*TODO*/";
+        }
+        else if (IsA(BytePropertyClass))
+        {
+            if (auto Enum = GetChild<UEnum*>(BasePropertySize))
+            {
+                // TODO
+                return std::format("TEnumAsByte<E{}>", Enum->GetName());
+            }
+            return "uint8";
+        }
+        else if (IsA(FloatPropertyClass)) return "float";
+        else if (IsA(DoublePropertyClass)) return "double";
+        else if (IsA(Int8PropertyClass)) return "int8";
+        else if (IsA(Int16PropertyClass)) return "int16";
+        else if (IsA(IntPropertyClass)) return "int32";
+        else if (IsA(Int64PropertyClass)) return "int64";
+        else if (IsA(UInt16PropertyClass)) return "uint16";
+        else if (IsA(UInt32PropertyClass)) return "uint32";
+        else if (IsA(UInt64PropertyClass)) return "uint64";
+        return "void /*TODO*/";
+    }
+
 
 
     static void InitUnrealCore()
     {
         UObject::Init();
+        UProperty::Init();
 
         // FMemory::Realloc
         {

@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <print>
+#include <vector>
 
 #include "UnrealCore.hpp"
 using namespace UnrealCore;
@@ -10,6 +11,7 @@ using namespace UnrealCore;
 
 // #define SEARCH_FOR_UNKNOWNS
 #include "KismetDisassembler.hpp"
+#include "KismetDecompiler.hpp"
 
 DWORD MainThread(HMODULE Module)
 {
@@ -48,7 +50,7 @@ DWORD MainThread(HMODULE Module)
     }
     MessageBox("No unknowns!");
 #else
-#if 1
+#if 0 // Disassemble all BlueprintGeneratedClasses
     for (int i = 0; i < UObject::Objects->Num(); i++)
     {
         auto Object = UObject::Objects->GetObject(i);
@@ -61,11 +63,17 @@ DWORD MainThread(HMODULE Module)
         }
     }
 #else
-    auto Class = UObject::FindClass(L"/Game/FrontEnd/Store/Weapons/Blueprints/Master/StoreWeaponMaster_BP.StoreWeaponMaster_BP_C");
+    auto Class = UObject::FindClass(L"/Game/Athena/Athena_PlayerController.Athena_PlayerController_C");
+#if 0 // Disassemble or Decompile
     std::ofstream outfile("scripts/" + Class->GetName() + ".txt");
-    // outfile << KismetDisassembler().Disassemble(Func);
     outfile << KismetDisassembler().Disassemble(Class);
     outfile.close();
+#else
+    std::ofstream outfile("decomp/" + Class->GetName() + ".txt");
+    outfile << KismetDecompiler().Disassemble(Class);
+    outfile.close();
+
+#endif
 #endif
 #endif
 
