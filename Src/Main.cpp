@@ -3,6 +3,7 @@
 #include <fstream>
 #include <print>
 #include <vector>
+#include <unordered_map>
 
 #include "UnrealCore.hpp"
 using namespace UnrealCore;
@@ -24,7 +25,6 @@ DWORD MainThread(HMODULE Module)
 
     // Just took a random ExecuteUbergraph
     auto Func = UObject::FindFunction(L"/Game/Athena/SupplyDrops/BP_DamageBalloon_Athena.BP_DamageBalloon_Athena_C:ExecuteUbergraph_BP_DamageBalloon_Athena");
-    // auto Class = UObject::FindClass(L"/Game/Athena/SupplyDrops/BP_DamageBalloon_Athena.BP_DamageBalloon_Athena_C");
     // auto Class = UObject::FindClass(L"/Game/Athena/PlayerPawn_Athena.PlayerPawn_Athena_C");
     auto BlueprintGeneratedClassClass = UObject::FindClass(L"/Script/Engine.BlueprintGeneratedClass");
 
@@ -65,6 +65,7 @@ DWORD MainThread(HMODULE Module)
 #else
     // auto Class = UObject::FindClass(L"/Game/Athena/Athena_PlayerController.Athena_PlayerController_C");
     auto Class = UObject::FindClass(L"/Game/Athena/PlayerPawn_Athena.PlayerPawn_Athena_C");
+    // auto Class = UObject::FindClass(L"/Game/Athena/SupplyDrops/BP_DamageBalloon_Athena.BP_DamageBalloon_Athena_C");
 #if 0 // Disassemble or Decompile
     std::ofstream outfile("scripts/" + Class->GetName() + ".txt");
     outfile << KismetDisassembler().Disassemble(Class);

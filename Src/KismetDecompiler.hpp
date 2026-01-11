@@ -6,6 +6,8 @@ private:
     int32 IndentCount = 0;
     int32 ScriptIndex = 0;
     UFunction* CurrentFunc;
+    UClass* CurrentClass;
+    std::unordered_map<UFunction*, std::vector<int32>> Labels;
 
 public:
     KismetDecompiler()
@@ -123,6 +125,413 @@ public:
         }
     }
 
+    EExprToken PreProcessToken()
+    {
+        EExprToken Token = (EExprToken)Script[ScriptIndex++];
+        std::println("0x{:X}", (uint8)Token);
+        switch (Token)
+        {
+            case EX_PushExecutionFlow:
+            {
+                auto Skip = ReadInt32();
+                Labels[CurrentFunc].push_back(Skip);
+                break;
+            }
+            case EX_ComputedJump:
+            {
+                PreProcessToken();
+                break;
+            }
+            case EX_LocalVariable:
+            {
+                ReadPtr<UProperty>();
+                break;
+            }
+            case EX_FinalFunction:
+            {
+                ReadPtr<UStruct>();
+                while (PreProcessToken() != EX_EndFunctionParms) { }
+                break;
+            }
+            case EX_EndFunctionParms:
+            {
+                break;
+            }
+            case EX_InstanceVariable:
+            {
+                ReadPtr<UProperty>();
+                break;
+            }
+            case EX_False:
+            {
+                break;
+            }
+            case EX_True:
+            {
+                break;
+            }
+            case EX_CallMulticastDelegate:
+            {
+                ReadPtr<UStruct>();
+                while (PreProcessToken() != EX_EndFunctionParms) {  }
+                break;
+            }
+            case EX_VirtualFunction:
+            {
+                auto Name = ReadName();
+                if (Name.starts_with("ExecuteUbergraph"))
+                {
+                    for (auto Child = CurrentClass->GetChildren(); Child; Child = Child->GetNext())
+                    {
+                        static auto FunctionClass = UObject::FindClass(L"/Script/CoreUObject.Function");
+                        if (!Child->IsA(FunctionClass)) continue;
+                        auto Func = (UFunction*)Child;
+                        if (Func->GetName().starts_with("ExecuteUbergraph"))
+                        {
+                            ScriptIndex++;
+                            Labels[Func].push_back(ReadInt32());
+                            ScriptIndex -= 5;
+                            break;
+                        }
+                    }
+                }
+                while (PreProcessToken() != EX_EndFunctionParms) { }
+                break;
+            }
+            case EX_PopExecutionFlow:
+            {
+                break;
+            }
+            case EX_PopExecutionFlowIfNot:
+            {
+                PreProcessToken();
+                break;
+            }
+            case EX_ClassContext:
+            case EX_Context:
+            case EX_Context_FailSilent:
+            {
+                PreProcessToken();
+                auto Skip = ReadInt32();
+
+                ReadPtr<UField>();
+                PreProcessToken();
+
+                break;
+            }
+            case EX_ObjectConst:
+            {
+                ReadPtr<UObject>();
+                break;
+            }
+            case EX_StructConst:
+            {
+                ReadPtr<UStruct>();
+                ReadInt32();
+                while (PreProcessToken() != EX_EndStructConst) { }
+                break;
+            }
+            case EX_EndStructConst:
+            {
+                break;
+            }
+            case EX_Self:
+            {
+                break;
+            }
+            case EX_StringConst:
+            {
+                ReadString8();
+                break;
+            }
+            case EX_Let:
+            {
+                ReadPtr<UProperty>();
+            }
+            case EX_LetWeakObjPtr:
+            case EX_LetObj:
+            case EX_LetBool:
+            {
+
+                PreProcessToken();
+                PreProcessToken();
+                break;
+            }
+            case EX_CallMath:
+            {
+                ReadPtr<UStruct>();
+                while (PreProcessToken() != EX_EndFunctionParms) {  }
+                break;
+            }
+            case EX_FloatConst:
+            {
+                ReadFloat();
+                break;
+            }
+            case EX_Jump:
+            {
+                Labels[CurrentFunc].push_back(ReadInt32());
+                break;
+            }
+            case EX_JumpIfNot:
+            {
+                Labels[CurrentFunc].push_back(ReadInt32());
+                PreProcessToken();
+                break;
+            }
+            case EX_Return:
+            {
+                PreProcessToken();
+                break;
+            }
+            case EX_Nothing:
+            {
+                break;
+            }
+            case EX_EndOfScript:
+            {
+                break;
+            }
+            case EX_NameConst:
+            {
+                ReadName();
+                break;
+            }
+            case EX_RotationConst:
+            {
+                ReadFloat();
+                ReadFloat();
+                ReadFloat();
+                break;
+            }
+            case EX_VectorConst:
+            {
+                ReadFloat();
+                ReadFloat();
+                ReadFloat();
+                break;
+            }
+            case EX_ByteConst:
+            {
+                ReadUInt8();
+                break;
+            }
+            case EX_IntConst:
+            {
+                ReadInt32();
+                break;
+            }
+            case EX_LocalOutVariable:
+            {
+                ReadPtr<UProperty>();
+                break;
+            }
+            case EX_LetValueOnPersistentFrame:
+            {
+                ReadPtr<UProperty>()->GetFullName();
+                PreProcessToken();
+                break;
+            }
+            case EX_SwitchValue:
+            {
+                auto Num = ReadUInt16();
+                auto Skip = ReadInt32();
+                PreProcessToken();
+                for (uint16 i = 0; i < Num; i++)
+                {
+                    PreProcessToken();
+                    auto Next = ReadInt32();
+                    PreProcessToken();
+                }
+                PreProcessToken();
+                break;
+            }
+            case EX_NoObject:
+            {
+                break;
+            }
+            case EX_StructMemberContext:
+            {
+                ReadPtr<UProperty>();
+                PreProcessToken();
+                break;
+            }
+            case EX_ObjToInterfaceCast:
+            {
+                ReadPtr<UClass>();
+                PreProcessToken();
+                break;
+            }
+            case EX_ArrayConst:
+            {
+                ReadPtr<UProperty>();
+                ReadInt32();
+                while (PreProcessToken() != EX_EndArrayConst) { }
+                break;
+            }
+            case EX_EndArrayConst:
+            {
+                break;
+            }
+            case EX_TransformConst:
+            {
+                ReadFloat();
+                ReadFloat(); 
+                ReadFloat();
+                ReadFloat();
+                ReadFloat();
+                ReadFloat(); 
+                ReadFloat();
+                ReadFloat();
+                ReadFloat();
+                ReadFloat();
+                break;
+            }
+            case EX_SkipOffsetConst:
+            {
+                auto Skip = ReadInt32();
+                break;
+            }
+            case EX_DynamicCast:
+            {
+                ReadPtr<UClass>();
+                PreProcessToken();
+                break;
+            }
+            case EX_PrimitiveCast:
+            {
+                ReadUInt8();
+                PreProcessToken();
+                break;
+            }
+            case EX_InterfaceContext:
+            {
+                PreProcessToken();
+                break;
+            }
+            case EX_SetArray:
+            {
+                PreProcessToken();
+                while (PreProcessToken() != EX_EndArray) { }
+                break;
+            }
+            case EX_EndArray:
+            {
+                break;
+            }
+            case EX_UnicodeStringConst:
+            {
+                ReadString16();
+                break;
+            }
+            case EX_TextConst:
+            {
+                auto Type = (EBlueprintTextLiteralType)ReadUInt8();
+                switch (Type)
+                {
+                    case EBlueprintTextLiteralType::Empty:
+                    {
+                        break;
+                    }
+                    case EBlueprintTextLiteralType::LocalizedText:
+                    {
+                        ReadString();
+                        ReadString();
+                        ReadString();
+                        break;
+                    }
+                    case EBlueprintTextLiteralType::InvariantText:
+                    {
+                        ReadString();
+                        break;
+                    }
+                    case EBlueprintTextLiteralType::LiteralString:
+                    {
+                        ReadString();
+                        break;
+                    }
+                    case EBlueprintTextLiteralType::StringTableEntry:
+                    {
+                        ReadPtr<UObject>();
+                        ReadString();
+                        ReadString();
+                        break;
+                    }
+                }
+                
+                break;
+            }
+            case EX_BindDelegate:
+            {
+                ReadName();
+
+                PreProcessToken();
+                PreProcessToken();
+                break;
+            }
+            case EX_AddMulticastDelegate:
+            {
+                PreProcessToken();
+                PreProcessToken();
+                break;
+            }
+            case EX_RemoveMulticastDelegate:
+            {
+                PreProcessToken();
+                PreProcessToken();
+                break;
+            }
+            case EX_DefaultVariable:
+            {
+                ReadPtr<UProperty>();
+                break;
+            }
+            case EX_ClearMulticastDelegate:
+            {
+                PreProcessToken();
+                break;
+            }
+            case EX_ArrayGetByRef:
+            {
+                PreProcessToken();
+                PreProcessToken();
+                break;
+            }
+            case EX_MetaCast:
+            {
+                ReadPtr<UClass>();
+                PreProcessToken();
+                break;
+            }
+            case EX_NoInterface:
+            {
+                break;
+            }
+            case EX_SetMap:
+            {
+                PreProcessToken();
+                ReadInt32();
+                while (PreProcessToken() != EX_EndMap) { }
+                break;
+            }
+            case EX_EndMap:
+            {
+                break;
+            }
+            case EX_SoftObjectConst:
+            {
+                PreProcessToken();
+                break;
+            }
+            default:
+            {
+                break;
+            }
+        }
+
+        return Token;
+    }
+
     EExprToken ProcessToken(bool CalledFromContext = false)
     {
         EExprToken Token = (EExprToken)Script[ScriptIndex++];
@@ -153,6 +562,7 @@ public:
                 break;
             }
             case EX_CallMath:
+            case EX_CallMulticastDelegate:
             case EX_FinalFunction:
             {
                 auto Func = ReadPtr<UFunction>();
@@ -178,17 +588,6 @@ public:
             case EX_True:
             {
                 Out += "true";
-                break;
-            }
-            case EX_CallMulticastDelegate:
-            {
-                auto Func = ReadPtr<UStruct>();
-                OutLine("EX_CallMulticastDelegate ({})", Func->GetFullName());
-
-                AddIndent();
-                while (ProcessToken() != EX_EndFunctionParms) {  }
-                DropIndent();
-
                 break;
             }
             case EX_VirtualFunction:
@@ -313,12 +712,12 @@ LetLogic:
             }
             case EX_RotationConst:
             {
-                Out += std::format("FRotator({:#.0f}f, {:#.0f}f, {:#.0f})f", ReadFloat(), ReadFloat(), ReadFloat());
+                Out += std::format("FRotator({:#.0f}f, {:#.0f}f, {:#.0f}f)", ReadFloat(), ReadFloat(), ReadFloat());
                 break;
             }
             case EX_VectorConst:
             {
-                Out += std::format("FVector({:#.0f}f, {:#.0f}f, {:#.0f})f", ReadFloat(), ReadFloat(), ReadFloat());
+                Out += std::format("FVector({:#.0f}f, {:#.0f}f, {:#.0f}f)", ReadFloat(), ReadFloat(), ReadFloat());
                 break;
             }
             case EX_ByteConst:
@@ -389,15 +788,24 @@ LetLogic:
             case EX_ArrayConst:
             {
                 auto Prop = ReadPtr<UProperty>();
-                OutLine("EX_ArrayConst (Size: {}) ({})", ReadInt32(), Prop->GetFullName());
-                AddIndent();
-                while (ProcessToken() != EX_EndArrayConst) { }
-                DropIndent();
+                Out += std::format("TArray<{}, {}>([", Prop->GetCPPType(), ReadInt32());
+                while (ProcessToken() != EX_EndArrayConst)
+                {
+                    if (Script[ScriptIndex] != EX_EndArrayConst)
+                    {
+                        Out += ", ";
+                    }
+                }
+                Out += "])";
+                // OutLine("EX_ArrayConst (Size: {}) ({})", ReadInt32(), Prop->GetFullName());
+                // AddIndent();
+                // while (ProcessToken() != EX_EndArrayConst) { }
+                // DropIndent();
                 break;
             }
             case EX_EndArrayConst:
             {
-                OutLine("EX_EndArrayConst");
+                // OutLine("EX_EndArrayConst");
                 break;
             }
             case EX_TransformConst:
@@ -627,9 +1035,10 @@ LetLogic:
         ScriptIndex = 0;
         while (ScriptIndex < Script.Num())
         {
-            // TODO Get required labels by doing an initial loop with no looping that logs every EX_Jump, EX_JumpIfNot, etc.
-            //      By doing that the output will be much more readable
-            Out += std::format("Label_{}:\n", ScriptIndex);
+            if (std::find(Labels[Function].begin(), Labels[Function].end(), ScriptIndex) != Labels[Function].end())
+            {
+                Out += std::format("\nLabel_{}:\n", ScriptIndex);
+            }
             Indent();
             auto Token = ProcessToken();
             // TODO Keep track of PushExecutionFlow/PopExecutionFlow to see if using return; is better than PopExecutionFlow()
@@ -645,9 +1054,23 @@ LetLogic:
 
     std::string Disassemble(UClass* Class)
     {
+        CurrentClass = Class;
+        static auto FunctionClass = UObject::FindClass(L"/Script/CoreUObject.Function");
         for (auto Child = Class->GetChildren(); Child; Child = Child->GetNext())
         {
-            static auto FunctionClass = UObject::FindClass(L"/Script/CoreUObject.Function");
+            if (!Child->IsA(FunctionClass)) continue;
+
+            Script = ((UFunction*)Child)->GetScript();
+            ScriptIndex = 0;
+            CurrentFunc = ((UFunction*)Child);
+            while (ScriptIndex < Script.Num())
+            {
+                PreProcessToken();
+            }
+        }
+
+        for (auto Child = Class->GetChildren(); Child; Child = Child->GetNext())
+        {
             if (!Child->IsA(FunctionClass)) continue;
 
             auto Func = (UFunction*)Child;

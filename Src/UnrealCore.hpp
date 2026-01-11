@@ -586,7 +586,7 @@ namespace UnrealCore
         /*TODO*/ static auto LazyObjectPropertyClass = UObject::FindClass(L"/Script/CoreUObject.LazyObjectProperty");
         /*TODO*/ static auto MapPropertyClass = UObject::FindClass(L"/Script/CoreUObject.MapProperty");
         /*TODO*/ static auto MulticastDelegatePropertyClass = UObject::FindClass(L"/Script/CoreUObject.MulticastDelegateProperty");
-        /*TODO*/ static auto NamePropertyClass = UObject::FindClass(L"/Script/CoreUObject.NameProperty");
+        static auto NamePropertyClass = UObject::FindClass(L"/Script/CoreUObject.NameProperty");
         /*TODO*/ static auto SetPropertyClass = UObject::FindClass(L"/Script/CoreUObject.SetProperty");
         /*TODO*/ static auto SoftObjectPropertyClass = UObject::FindClass(L"/Script/CoreUObject.SoftObjectProperty");
         /*TODO*/ static auto SoftClassPropertyClass = UObject::FindClass(L"/Script/CoreUObject.SoftClassProperty");
@@ -596,7 +596,7 @@ namespace UnrealCore
         static auto UInt32PropertyClass = UObject::FindClass(L"/Script/CoreUObject.UInt32Property");
         static auto UInt64PropertyClass = UObject::FindClass(L"/Script/CoreUObject.UInt64Property");
         /*TODO*/ static auto WeakObjectPropertyClass = UObject::FindClass(L"/Script/CoreUObject.WeakObjectProperty");
-        /*TODO*/ static auto TextPropertyClass = UObject::FindClass(L"/Script/CoreUObject.TextProperty");
+        static auto TextPropertyClass = UObject::FindClass(L"/Script/CoreUObject.TextProperty");
 
         static auto BasePropertySize = UObject::FindClass(L"/Script/CoreUObject.Property")->GetSize();
 
@@ -622,6 +622,10 @@ namespace UnrealCore
             }
             return "uint8";
         }
+        else if (IsA(StructPropertyClass))
+        {
+            return GetChild<UStruct*>(BasePropertySize)->GetCPPName();
+        }
         else if (IsA(FloatPropertyClass)) return "float";
         else if (IsA(DoublePropertyClass)) return "double";
         else if (IsA(Int8PropertyClass)) return "int8";
@@ -631,6 +635,8 @@ namespace UnrealCore
         else if (IsA(UInt16PropertyClass)) return "uint16";
         else if (IsA(UInt32PropertyClass)) return "uint32";
         else if (IsA(UInt64PropertyClass)) return "uint64";
+        else if (IsA(NamePropertyClass)) return "FName";
+        else if (IsA(TextPropertyClass)) return "FText";
         return "void /*TODO*/";
     }
 
