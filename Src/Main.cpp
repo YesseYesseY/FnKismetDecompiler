@@ -8,6 +8,7 @@ using namespace UnrealCore;
 
 #define MessageBox(...) MessageBoxA(NULL, std::format(__VA_ARGS__).c_str(), "KismetDecompiler", MB_OK)
 
+// #define SEARCH_FOR_UNKNOWNS
 #include "KismetDisassembler.hpp"
 
 DWORD MainThread(HMODULE Module)
@@ -21,12 +22,52 @@ DWORD MainThread(HMODULE Module)
 
     // Just took a random ExecuteUbergraph
     auto Func = UObject::FindFunction(L"/Game/Athena/SupplyDrops/BP_DamageBalloon_Athena.BP_DamageBalloon_Athena_C:ExecuteUbergraph_BP_DamageBalloon_Athena");
-    auto Class = UObject::FindClass(L"/Game/Athena/SupplyDrops/BP_DamageBalloon_Athena.BP_DamageBalloon_Athena_C");
+    // auto Class = UObject::FindClass(L"/Game/Athena/SupplyDrops/BP_DamageBalloon_Athena.BP_DamageBalloon_Athena_C");
+    // auto Class = UObject::FindClass(L"/Game/Athena/PlayerPawn_Athena.PlayerPawn_Athena_C");
+    auto BlueprintGeneratedClassClass = UObject::FindClass(L"/Script/Engine.BlueprintGeneratedClass");
 
-    std::ofstream outfile("script.txt");
+#ifdef SEARCH_FOR_UNKNOWNS
+    auto SystemLib = UObject::FindObject(L"/Script/Engine.Default__KismetSystemLibrary");
+    struct {
+        UObject* WorldContext;
+        FString Cmd;
+        UObject* Player;
+    } args { UObject::FindObject(L"/Game/Maps/Frontend.Frontend"), L"open Athena_Terrain" };
+    SystemLib->ProcessEvent("ExecuteConsoleCommand", &args);
+
+    MessageBox("Click OK to search for unknowns");
+
+    for (int i = 0; i < UObject::Objects->Num(); i++)
+    {
+        auto Object = UObject::Objects->GetObject(i);
+        if (Object && Object->IsA(BlueprintGeneratedClassClass))
+        {
+            auto Class = (UClass*)Object;
+            KismetDisassembler().Disassemble(Class);
+        }
+    }
+    MessageBox("No unknowns!");
+#else
+#if 1
+    for (int i = 0; i < UObject::Objects->Num(); i++)
+    {
+        auto Object = UObject::Objects->GetObject(i);
+        if (Object && Object->IsA(BlueprintGeneratedClassClass))
+        {
+            auto Class = (UClass*)Object;
+            std::ofstream outfile("scripts/" + Class->GetName() + ".txt");
+            outfile << KismetDisassembler().Disassemble(Class);
+            outfile.close();
+        }
+    }
+#else
+    auto Class = UObject::FindClass(L"/Game/FrontEnd/Store/Weapons/Blueprints/Master/StoreWeaponMaster_BP.StoreWeaponMaster_BP_C");
+    std::ofstream outfile("scripts/" + Class->GetName() + ".txt");
     // outfile << KismetDisassembler().Disassemble(Func);
     outfile << KismetDisassembler().Disassemble(Class);
     outfile.close();
+#endif
+#endif
 
     return 0;
 }

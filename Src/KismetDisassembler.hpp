@@ -124,6 +124,15 @@ enum EExprToken
     EX_Max                       = 0x100,
 };
 
+enum class EBlueprintTextLiteralType : uint8
+{
+    Empty,
+    LocalizedText,
+    InvariantText,
+    LiteralString,
+    StringTableEntry,
+};
+
 struct FScriptName
 {
     int32 ComparisonIndex;
@@ -146,6 +155,7 @@ private:
     std::string Out;
     int32 IndentCount = 0;
     int32 ScriptIndex = 0;
+    UFunction* CurrentFunc;
 
 public:
     KismetDisassembler()
@@ -166,6 +176,16 @@ public:
         return ReadBasic<int32>();
     }
 
+    uint8 ReadUInt8()
+    {
+        return ReadBasic<uint8>();
+    }
+
+    uint16 ReadUInt16()
+    {
+        return ReadBasic<uint16>();
+    }
+
     uint64 ReadUInt64()
     {
         return ReadBasic<uint64>();
@@ -182,11 +202,6 @@ public:
         return ReadBasic<float>();
     }
 
-    uint8 ReadUInt8()
-    {
-        return ReadBasic<uint8>();
-    }
-
     std::string ReadName()
     {
         auto ret = ((FScriptName*)(&Script[ScriptIndex]))->ToString();
@@ -194,11 +209,33 @@ public:
         return ret;
     }
 
-    std::string ReadString()
+    std::string ReadString8()
     {
         auto ret = std::string((const char*)(&Script[ScriptIndex]));
         ScriptIndex += ret.size() + 1;
         return ret;
+    }
+
+    std::string ReadString16()
+    {
+        auto retw = std::wstring((const wchar_t*)(&Script[ScriptIndex]));
+        ScriptIndex += (retw.size() + 1) * 2;
+        return std::string(retw.begin(), retw.end());
+    }
+
+    std::string ReadString()
+    {
+        auto type = (EExprToken)ReadUInt8();
+
+        switch (type)
+        {
+            case EX_StringConst:
+                return ReadString8();
+            case EX_UnicodeStringConst:
+                return ReadString16();
+        }
+
+        return "idk what happened here";
     }
 
     void Indent()
@@ -353,17 +390,17 @@ ContextLogic:
                 OutLine("EX_ObjectConst ({})", Object->GetFullName());
                 break;
             }
-            // case EX_StructConst:
-            // {
-            //     auto Struct = ReadPtr<UStruct>(ScriptIndex);
-            //     auto Size = ReadInt32(ScriptIndex);
-            //     OutLine("EX_StructConst ({}) (Size: {})", Struct->GetFullName(), Size);
+            case EX_StructConst:
+            {
+                auto Struct = ReadPtr<UStruct>();
+                auto Size = ReadInt32();
+                OutLine("EX_StructConst ({}) (Size: {})", Struct->GetFullName(), Size);
 
-            //     AddIndent();
-            //     while (ProcessToken(ScriptIndex) != EX_EndStructConst) { }
-            //     DropIndent();
-            //     break;
-            // }
+                AddIndent();
+                while (ProcessToken() != EX_EndStructConst) { }
+                DropIndent();
+                break;
+            }
             case EX_EndStructConst:
             {
                 OutLine("EX_EndStructConst");
@@ -376,9 +413,14 @@ ContextLogic:
             }
             case EX_StringConst:
             {
-                auto Str = ReadString();
+                auto Str = ReadString8();
                 OutLine("EX_StringConst (\"{}\")", Str);
                 break;
+            }
+            case EX_LetWeakObjPtr:
+            {
+                OutLine("EX_LetWeakObjPtr");
+                goto LetLogic;
             }
             case EX_LetObj:
             {
@@ -499,8 +541,271 @@ LetLogic:
 
                 break;
             }
+            case EX_SwitchValue:
+            {
+                auto Num = ReadUInt16();
+                auto Skip = ReadInt32();
+                OutLine("EX_SwitchValue (Num: {}) (Skip: {})", Num, Skip);
+
+                AddIndent();
+                OutLine("// Index");
+                ProcessToken();
+                OutLine("");
+
+                for (uint16 i = 0; i < Num; i++)
+                {
+                    OutLine("// Case {}", i);
+                    ProcessToken();
+                    auto Next = ReadInt32();
+                    OutLine("// Next {}", Next);
+                    OutLine("");
+                    ProcessToken();
+                }
+                OutLine("");
+                OutLine("// Default");
+
+                ProcessToken();
+                DropIndent();
+                break;
+            }
+            case EX_NoObject:
+            {
+                OutLine("EX_NoObject");
+                break;
+            }
+            case EX_StructMemberContext:
+            {
+                OutLine("EX_StructMemberContext");
+
+                AddIndent();
+                OutLine("// Var ({})", ReadPtr<UProperty>()->GetFullName());
+                OutLine("");
+                OutLine("// Expr");
+                ProcessToken();
+                DropIndent();
+                break;
+            }
+            case EX_ObjToInterfaceCast:
+            {
+                OutLine("EX_ObjToInterfaceCast ({})", ReadPtr<UClass>()->GetFullName());
+                break;
+            }
+            case EX_ArrayConst:
+            {
+                auto Prop = ReadPtr<UProperty>();
+                OutLine("EX_ArrayConst (Size: {}) ({})", ReadInt32(), Prop->GetFullName());
+                AddIndent();
+                while (ProcessToken() != EX_EndArrayConst) { }
+                DropIndent();
+                break;
+            }
+            case EX_EndArrayConst:
+            {
+                OutLine("EX_EndArrayConst");
+                break;
+            }
+            case EX_TransformConst:
+            {
+                OutLine("EX_TransformConst Rot ({}, {}, {}, {}), Pos ({}, {}, {}), Size ({}, {}, {})",
+                        ReadFloat(), ReadFloat(), ReadFloat(), ReadFloat(),
+                        ReadFloat(), ReadFloat(), ReadFloat(),
+                        ReadFloat(), ReadFloat(), ReadFloat()
+                        );
+                break;
+            }
+            case EX_SkipOffsetConst:
+            {
+                OutLine("EX_SkipOffsetConst ({})", ReadInt32());
+                break;
+            }
+            case EX_DynamicCast:
+            {
+                OutLine("EX_DynamicCast ({})", ReadPtr<UClass>()->GetFullName());
+                break;
+            }
+            case EX_PrimitiveCast:
+            {
+                OutLine("EX_PrimitiveCast ({})", ReadUInt8());
+                AddIndent();
+                ProcessToken();
+                DropIndent();
+                break;
+            }
+            case EX_InterfaceContext:
+            {
+                OutLine("EX_InterfaceContext");
+                
+                AddIndent();
+                ProcessToken();
+                DropIndent();
+                break;
+            }
+            case EX_SetArray:
+            {
+                OutLine("EX_SetArray");
+                AddIndent();
+                ProcessToken();
+                AddIndent();
+                while (ProcessToken() != EX_EndArray) { }
+                DropIndent();
+                DropIndent();
+                break;
+            }
+            case EX_EndArray:
+            {
+                OutLine("EX_EndArray");
+                break;
+            }
+            case EX_UnicodeStringConst:
+            {
+                OutLine("EX_UnicodeStringConst (L\"{}\")", ReadString16());
+                break;
+            }
+            case EX_TextConst:
+            {
+                auto Type = (EBlueprintTextLiteralType)ReadUInt8();
+                switch (Type)
+                {
+                    case EBlueprintTextLiteralType::Empty:
+                    {
+                        OutLine("EX_TextConst (Empty)");
+                        break;
+                    }
+                    case EBlueprintTextLiteralType::LocalizedText:
+                    {
+                        OutLine("Ex_TextConst (Localized)");
+                        AddIndent();
+                        OutLine("Source = \"{}\"", ReadString());
+                        OutLine("Key = \"{}\"", ReadString());
+                        OutLine("NameSpace = \"{}\"", ReadString());
+                        DropIndent();
+                        break;
+                    }
+                    case EBlueprintTextLiteralType::InvariantText:
+                    {
+                        OutLine("Ex_TextConst (Invariant)");
+                        AddIndent();
+                        OutLine("Str = \"{}\"", ReadString());
+                        DropIndent();
+                        break;
+                    }
+                    case EBlueprintTextLiteralType::LiteralString:
+                    {
+                        OutLine("Ex_TextConst (Literal)");
+                        AddIndent();
+                        OutLine("Str = \"{}\"", ReadString());
+                        DropIndent();
+                        break;
+                    }
+                    case EBlueprintTextLiteralType::StringTableEntry:
+                    {
+                        OutLine("Ex_TextConst (StringTable)");
+                        AddIndent();
+                        OutLine("StringTable = \"{}\"", ReadPtr<UObject>()->GetFullName());
+                        OutLine("TableId = \"{}\"", ReadString());
+                        OutLine("Key = \"{}\"", ReadString());
+                        DropIndent();
+                        break;
+                    }
+                }
+                
+                break;
+            }
+            case EX_BindDelegate:
+            {
+                OutLine("EX_BindDelegate ({})", ReadName());
+
+                AddIndent();
+                OutLine("// Delegate");
+                ProcessToken();
+                OutLine("");
+                OutLine("// Object");
+                ProcessToken();
+                DropIndent();
+                break;
+            }
+            case EX_AddMulticastDelegate:
+            {
+                OutLine("EX_AddMulticastDelegate");
+                AddIndent();
+                ProcessToken();
+                ProcessToken();
+                DropIndent();
+                break;
+            }
+            case EX_RemoveMulticastDelegate:
+            {
+                OutLine("EX_RemoveMulticastDelegate");
+                AddIndent();
+                ProcessToken();
+                ProcessToken();
+                DropIndent();
+                break;
+            }
+            case EX_DefaultVariable:
+            {
+                OutLine("EX_DefaultVariable ({})", ReadPtr<UProperty>()->GetFullName());
+                break;
+            }
+            case EX_ClearMulticastDelegate:
+            {
+                OutLine("EX_ClearMulticastDelegate");
+                AddIndent();
+                ProcessToken();
+                DropIndent();
+                break;
+            }
+            case EX_ArrayGetByRef:
+            {
+                OutLine("EX_ArrayGetByRef");
+                AddIndent();
+                ProcessToken();
+                ProcessToken();
+                DropIndent();
+                break;
+            }
+            case EX_MetaCast:
+            {
+                OutLine("EX_MetaCast ({})", ReadPtr<UClass>()->GetFullName());
+                AddIndent();
+                ProcessToken();
+                DropIndent();
+                break;
+            }
+            case EX_NoInterface:
+            {
+                OutLine("EX_NoInterface");
+                break;
+            }
+            case EX_SetMap:
+            {
+                OutLine("EX_SetMap");
+                AddIndent();
+                ProcessToken();
+                OutLine("// Size: {}", ReadInt32());
+                OutLine("");
+                while (ProcessToken() != EX_EndMap) { }
+                DropIndent();
+                break;
+            }
+            case EX_EndMap:
+            {
+                OutLine("EX_EndMap");
+                break;
+            }
+            case EX_SoftObjectConst:
+            {
+                OutLine("EX_SoftObjectConst");
+                AddIndent();
+                ProcessToken();
+                DropIndent();
+                break;
+            }
             default:
             {
+#ifdef SEARCH_FOR_UNKNOWNS
+                MessageBox("UNKNOWN AT {}", CurrentFunc->GetFullName());
+#endif
                 OutLine("Unknown: 0x{:02X}", (uint8)Token);
                 ScriptIndex = Script.Num(); // Skip it all to try avoid crashes (will prob still crash)
                 break;
@@ -512,6 +817,7 @@ LetLogic:
 
     std::string Disassemble(UFunction* Function)
     {
+        CurrentFunc = Function;
         Script = Function->GetScript();
         OutLine("// Script Size: {}", Script.Num());
         OutLine("void {}()", Function->GetName());
