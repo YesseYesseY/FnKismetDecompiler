@@ -24,6 +24,7 @@ namespace UnrealCore
         static int32 UStruct_Script = -1;
 
         static int32 UProperty_Offset = -1;
+        static int32 UProperty_PropertyFlags = -1;
 
         static int32 UFunction_ExecFunc = -1;
         static int32 UFunction_FunctionFlags = -1;
@@ -358,6 +359,16 @@ namespace UnrealCore
             return GetChild<int32>(Offsets::UProperty_Offset);
         }
 
+        EPropertyFlags GetPropertyFlags()
+        {
+            return GetChild<EPropertyFlags>(Offsets::UProperty_PropertyFlags);
+        }
+
+        bool HasPropertyFlag(EPropertyFlags Flag)
+        {
+            return (GetPropertyFlags() & Flag) != CPF_None;
+        }
+
         std::string GetCPPType();
     };
 
@@ -459,6 +470,23 @@ namespace UnrealCore
         bool HasFunctionFlag(EFunctionFlags Flag)
         {
             return (GetFunctionFlags() & Flag) != EFunctionFlags::FUNC_None;
+        }
+
+        UProperty* GetReturnProp()
+        {
+            static auto FunctionClass = FindClass(L"/Script/CoreUObject.Function");
+            for (auto Child = GetChildren(); Child; Child = Child->GetNext())
+            {
+                if (Child->IsA(FunctionClass)) continue; // This shouldn't be needed... i think... 99% sure
+
+                auto Prop = (UProperty*)Child;
+                if (Prop->HasPropertyFlag(CPF_ReturnParm))
+                {
+                    return Prop;
+                }
+            }
+
+            return nullptr;
         }
     };
 
@@ -569,8 +597,8 @@ namespace UnrealCore
     std::string UProperty::GetCPPType()
     {
         /*TODO*/ static auto EnumPropertyClass = UObject::FindClass(L"/Script/CoreUObject.EnumProperty");
-        /*TODO*/ static auto ArrayPropertyClass = UObject::FindClass(L"/Script/CoreUObject.ArrayProperty");
-        /*TODO*/ static auto ObjectPropertyBaseClass = UObject::FindClass(L"/Script/CoreUObject.ObjectPropertyBase");
+        static auto ArrayPropertyClass = UObject::FindClass(L"/Script/CoreUObject.ArrayProperty");
+        static auto ObjectPropertyBaseClass = UObject::FindClass(L"/Script/CoreUObject.ObjectPropertyBase");
         static auto BoolPropertyClass = UObject::FindClass(L"/Script/CoreUObject.BoolProperty");
         static auto BytePropertyClass = UObject::FindClass(L"/Script/CoreUObject.ByteProperty");
         /*TODO*/ static auto ObjectPropertyClass = UObject::FindClass(L"/Script/CoreUObject.ObjectProperty");
@@ -590,8 +618,8 @@ namespace UnrealCore
         /*TODO*/ static auto SetPropertyClass = UObject::FindClass(L"/Script/CoreUObject.SetProperty");
         /*TODO*/ static auto SoftObjectPropertyClass = UObject::FindClass(L"/Script/CoreUObject.SoftObjectProperty");
         /*TODO*/ static auto SoftClassPropertyClass = UObject::FindClass(L"/Script/CoreUObject.SoftClassProperty");
-        /*TODO*/ static auto StrPropertyClass = UObject::FindClass(L"/Script/CoreUObject.StrProperty");
-        /*TODO*/ static auto StructPropertyClass = UObject::FindClass(L"/Script/CoreUObject.StructProperty");
+        static auto StrPropertyClass = UObject::FindClass(L"/Script/CoreUObject.StrProperty");
+        static auto StructPropertyClass = UObject::FindClass(L"/Script/CoreUObject.StructProperty");
         static auto UInt16PropertyClass = UObject::FindClass(L"/Script/CoreUObject.UInt16Property");
         static auto UInt32PropertyClass = UObject::FindClass(L"/Script/CoreUObject.UInt32Property");
         static auto UInt64PropertyClass = UObject::FindClass(L"/Script/CoreUObject.UInt64Property");
@@ -618,13 +646,21 @@ namespace UnrealCore
             if (auto Enum = GetChild<UEnum*>(BasePropertySize))
             {
                 // TODO
-                return std::format("TEnumAsByte<E{}>", Enum->GetName());
+                return std::format("TEnumAsByte<>");
             }
             return "uint8";
         }
         else if (IsA(StructPropertyClass))
         {
             return GetChild<UStruct*>(BasePropertySize)->GetCPPName();
+        }
+        else if (IsA(ArrayPropertyClass))
+        {
+            return std::format("TArray<{}>", GetChild<UProperty*>(BasePropertySize)->GetCPPType());
+        }
+        else if (IsA(ObjectPropertyBaseClass))
+        {
+            return std::format("{}*", GetChild<UClass*>(BasePropertySize)->GetCPPName());
         }
         else if (IsA(FloatPropertyClass)) return "float";
         else if (IsA(DoublePropertyClass)) return "double";
@@ -637,6 +673,7 @@ namespace UnrealCore
         else if (IsA(UInt64PropertyClass)) return "uint64";
         else if (IsA(NamePropertyClass)) return "FName";
         else if (IsA(TextPropertyClass)) return "FText";
+        else if (IsA(StrPropertyClass)) return "FString";
         return "void /*TODO*/";
     }
 
@@ -689,6 +726,7 @@ namespace UnrealCore
         Offsets::UStruct_Size = Offsets::UStruct_Children + 0x8;
         Offsets::UStruct_Script = Offsets::UStruct_Size + 0x8;
 
+        Offsets::UProperty_PropertyFlags = 0x38;
         Offsets::UProperty_Offset = 0x44;
 
         auto StructClass = UObject::FindClass(L"/Script/CoreUObject.Struct");

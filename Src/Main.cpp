@@ -10,7 +10,7 @@ using namespace UnrealCore;
 
 #define MessageBox(...) MessageBoxA(NULL, std::format(__VA_ARGS__).c_str(), "KismetDecompiler", MB_OK)
 
-#define SEARCH_FOR_UNKNOWNS
+// #define SEARCH_FOR_UNKNOWNS
 #include "KismetDisassembler.hpp"
 #include "KismetDecompiler.hpp"
 
@@ -66,11 +66,10 @@ DWORD MainThread(HMODULE Module)
     }
 #else
     // auto Class = UObject::FindClass(L"/Game/Athena/Athena_PlayerController.Athena_PlayerController_C");
-    // auto Class = UObject::FindClass(L"/Game/Athena/PlayerPawn_Athena.PlayerPawn_Athena_C");
+    auto Class = UObject::FindClass(L"/Game/Athena/PlayerPawn_Athena.PlayerPawn_Athena_C");
     // auto Class = UObject::FindClass(L"/Game/Athena/SupplyDrops/BP_DamageBalloon_Athena.BP_DamageBalloon_Athena_C");
-
-    auto Class = UObject::FindClass(L"/Game/Athena/DrivableVehicles/Mech/TestMechVehicle.TestMechVehicle_C");
-#if 1 // Disassemble or Decompile
+    // auto Class = UObject::FindClass(L"/Game/Athena/DrivableVehicles/Mech/TestMechVehicle.TestMechVehicle_C");
+#if 0 // Disassemble or Decompile
     std::ofstream outfile("script.txt");
     outfile << KismetDisassembler().Disassemble(Class);
     outfile.close();

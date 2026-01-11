@@ -490,6 +490,11 @@ LetLogic:
                 DropIndent();
                 break;
             }
+            case EX_NothingInt32:
+            {
+                OutLine("EX_NothingInt32");
+                break;
+            }
             case EX_Nothing:
             {
                 OutLine("EX_Nothing");

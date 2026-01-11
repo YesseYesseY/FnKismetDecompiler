@@ -286,6 +286,7 @@ public:
                 PreProcessToken();
                 break;
             }
+            case EX_NothingInt32:
             case EX_Nothing:
             {
                 break;
@@ -700,6 +701,7 @@ LetLogic:
                 ProcessToken();
                 break;
             }
+            case EX_NothingInt32:
             case EX_Nothing:
             {
                 // OutLine("EX_Nothing");
@@ -835,7 +837,7 @@ LetLogic:
             }
             case EX_SkipOffsetConst:
             {
-                Out += std::format("/*Skip {}*/", ReadInt32());
+                Out += std::format("{}", ReadInt32());
                 break;
             }
             case EX_DynamicCast:
@@ -863,18 +865,20 @@ LetLogic:
             }
             case EX_SetArray:
             {
-                OutLine("EX_SetArray");
-                AddIndent();
                 ProcessToken();
-                AddIndent();
-                while (ProcessToken() != EX_EndArray) { }
-                DropIndent();
-                DropIndent();
+                Out += " = [";
+                while (ProcessToken() != EX_EndArray)
+                {
+                    if (Script[ScriptIndex] != EX_EndArray)
+                    {
+                        Out += ", ";
+                    }
+                }
+                Out += ']';
                 break;
             }
             case EX_EndArray:
             {
-                OutLine("EX_EndArray");
                 break;
             }
             case EX_UnicodeStringConst:
@@ -889,43 +893,30 @@ LetLogic:
                 {
                     case EBlueprintTextLiteralType::Empty:
                     {
-                        OutLine("EX_TextConst (Empty)");
+                        Out += "FText::GetEmpty()"; // FText() also works
                         break;
                     }
                     case EBlueprintTextLiteralType::LocalizedText:
                     {
-                        OutLine("Ex_TextConst (Localized)");
-                        AddIndent();
-                        OutLine("Source = \"{}\"", ReadString());
-                        OutLine("Key = \"{}\"", ReadString());
-                        OutLine("NameSpace = \"{}\"", ReadString());
-                        DropIndent();
+                        Out += std::format("FText::Localized(\"{}\", \"{}\", \"{}\")", ReadString(), ReadString(), ReadString());
                         break;
                     }
                     case EBlueprintTextLiteralType::InvariantText:
                     {
-                        OutLine("Ex_TextConst (Invariant)");
-                        AddIndent();
-                        OutLine("Str = \"{}\"", ReadString());
-                        DropIndent();
+                        Out += std::format("FText::Invariant(\"{}\")", ReadString());
                         break;
                     }
                     case EBlueprintTextLiteralType::LiteralString:
                     {
-                        OutLine("Ex_TextConst (Literal)");
-                        AddIndent();
-                        OutLine("Str = \"{}\"", ReadString());
-                        DropIndent();
+                        Out += std::format("FText::Literal(\"{}\")", ReadString());
                         break;
                     }
                     case EBlueprintTextLiteralType::StringTableEntry:
                     {
-                        OutLine("Ex_TextConst (StringTable)");
-                        AddIndent();
-                        OutLine("StringTable = \"{}\"", ReadPtr<UObject>()->GetFullName());
-                        OutLine("TableId = \"{}\"", ReadString());
-                        OutLine("Key = \"{}\"", ReadString());
-                        DropIndent();
+                        // TODO I haven't found a single function that uses this so i have no idea what to expect
+                        ReadPtr<UObject>();
+                        ReadString();
+                        ReadString();
                         break;
                     }
                 }
@@ -934,33 +925,36 @@ LetLogic:
             }
             case EX_BindDelegate:
             {
-                OutLine("EX_BindDelegate ({})", ReadName());
+                auto Event = ReadName();
+                ProcessToken();
+                Out += std::format(".Bind(\"{}\", ", Event);
+                ProcessToken();
+                Out += ')';
+                // OutLine("EX_BindDelegate ({})", ReadName());
 
-                AddIndent();
-                OutLine("// Delegate");
-                ProcessToken();
-                OutLine("");
-                OutLine("// Object");
-                ProcessToken();
-                DropIndent();
+                // AddIndent();
+                // OutLine("// Delegate");
+                // ProcessToken();
+                // OutLine("");
+                // OutLine("// Object");
+                // ProcessToken();
+                // DropIndent();
                 break;
             }
             case EX_AddMulticastDelegate:
             {
-                OutLine("EX_AddMulticastDelegate");
-                AddIndent();
                 ProcessToken();
+                Out += ".Add(";
                 ProcessToken();
-                DropIndent();
+                Out += ")";
                 break;
             }
             case EX_RemoveMulticastDelegate:
             {
-                OutLine("EX_RemoveMulticastDelegate");
-                AddIndent();
                 ProcessToken();
+                Out += ".Remove(";
                 ProcessToken();
-                DropIndent();
+                Out += ")";
                 break;
             }
             case EX_DefaultVariable:
@@ -970,10 +964,8 @@ LetLogic:
             }
             case EX_ClearMulticastDelegate:
             {
-                OutLine("EX_ClearMulticastDelegate");
-                AddIndent();
                 ProcessToken();
-                DropIndent();
+                Out += ".Clear()";
                 break;
             }
             case EX_ArrayGetByRef:
@@ -1041,7 +1033,28 @@ LetLogic:
         CurrentFunc = Function;
         Script = Function->GetScript();
         OutLine("// Script Size: {}", Script.Num());
-        OutLine("void {}()", Function->GetName());
+        std::string rettype = "void";
+        if (auto retprop = Function->GetReturnProp())
+            rettype = retprop->GetCPPType();
+
+        Indent();
+        Out += std::format("{} {}(", rettype, Function->GetName());
+        std::vector<UProperty*> Parms;
+        for (auto Child = Function->GetChildren(); Child; Child = Child->GetNext())
+        {
+            auto Prop = (UProperty*)Child;
+            if (Prop->HasPropertyFlag(CPF_Parm))
+            {
+                Parms.push_back(Prop);
+            }
+        }
+        for (int i = 0; i < Parms.size(); i++)
+        {
+            Out += std::format("{} {}", Parms[i]->GetCPPType(), Parms[i]->GetName());
+            if (i != Parms.size() - 1)
+                Out += ", ";
+        }
+        Out += ')';
         OutLine("{{");
         AddIndent();
         ScriptIndex = 0;
@@ -1051,12 +1064,14 @@ LetLogic:
             {
                 Out += std::format("\nLabel_{}:\n", ScriptIndex);
             }
-            Indent();
+            if (Script[ScriptIndex] != EX_EndOfScript)
+                Indent();
             auto Token = ProcessToken();
-            // TODO Keep track of PushExecutionFlow/PopExecutionFlow to see if using return; is better than PopExecutionFlow()
+            // TODO? Look at static functions such as UKismetMathLibrary::Greater_FloatFloat(RandomArg, 2.5f) and turn it into RandomArg > 2.5f
             if (Token != EX_Nothing && Token != EX_EndOfScript)
                  Out += ';';
-            Out += '\n';
+            if (Token != EX_EndOfScript)
+                Out += '\n';
             // OutLine("");
         }
         DropIndent();
@@ -1081,6 +1096,8 @@ LetLogic:
             }
         }
 
+        Out += std::format("class {} : public {}\n{{\n", Class->GetCPPName(), Class->GetSuperStruct()->GetCPPName());
+        AddIndent();
         for (auto Child = Class->GetChildren(); Child; Child = Child->GetNext())
         {
             if (!Child->IsA(FunctionClass)) continue;
@@ -1089,6 +1106,8 @@ LetLogic:
             Disassemble(Func);
             OutLine("");
         }
+        DropIndent();
+        Out += "}";
 
         return Out;
     }
