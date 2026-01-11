@@ -147,6 +147,7 @@ public:
                 ReadPtr<UProperty>();
                 break;
             }
+            case EX_LocalFinalFunction:
             case EX_FinalFunction:
             {
                 ReadPtr<UStruct>();
@@ -176,6 +177,7 @@ public:
                 while (PreProcessToken() != EX_EndFunctionParms) {  }
                 break;
             }
+            case EX_LocalVirtualFunction:
             case EX_VirtualFunction:
             {
                 auto Name = ReadName();
@@ -356,6 +358,7 @@ public:
                 PreProcessToken();
                 break;
             }
+            case EX_InterfaceToObjCast:
             case EX_ObjToInterfaceCast:
             {
                 ReadPtr<UClass>();
@@ -563,6 +566,7 @@ public:
             }
             case EX_CallMath:
             case EX_CallMulticastDelegate:
+            case EX_LocalFinalFunction:
             case EX_FinalFunction:
             {
                 auto Func = ReadPtr<UFunction>();
@@ -590,6 +594,7 @@ public:
                 Out += "true";
                 break;
             }
+            case EX_LocalVirtualFunction:
             case EX_VirtualFunction:
             {
                 Out += std::format("{}(", ReadName());
@@ -781,6 +786,13 @@ LetLogic:
             case EX_ObjToInterfaceCast:
             {
                 Out += std::format("GetInterface<I{}>(", ReadPtr<UClass>()->GetName());
+                ProcessToken();
+                Out += ')';
+                break;
+            }
+            case EX_InterfaceToObjCast:
+            {
+                Out += std::format("GetObject<{}>(", ReadPtr<UClass>()->GetCPPName());
                 ProcessToken();
                 Out += ')';
                 break;

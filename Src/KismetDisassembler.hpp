@@ -289,6 +289,7 @@ public:
 
                 break;
             }
+            case EX_LocalFinalFunction:
             case EX_FinalFunction:
             {
                 auto Func = ReadPtr<UStruct>();
@@ -334,6 +335,7 @@ public:
 
                 break;
             }
+            case EX_LocalVirtualFunction:
             case EX_VirtualFunction:
             {
                 OutLine("EX_VirtualFunction ({})", ReadName());
@@ -589,6 +591,14 @@ LetLogic:
             case EX_ObjToInterfaceCast:
             {
                 OutLine("EX_ObjToInterfaceCast ({})", ReadPtr<UClass>()->GetFullName());
+                AddIndent();
+                ProcessToken();
+                DropIndent();
+                break;
+            }
+            case EX_InterfaceToObjCast:
+            {
+                OutLine("EX_InterfaceToObjCast ({})", ReadPtr<UClass>()->GetFullName());
                 AddIndent();
                 ProcessToken();
                 DropIndent();
