@@ -144,7 +144,7 @@ public:
             }
             case EX_LocalVariable:
             {
-                ReadPtr<UProperty>();
+                ReadPtr<UnrealProperty>();
                 break;
             }
             case EX_LocalFinalFunction:
@@ -160,7 +160,7 @@ public:
             }
             case EX_InstanceVariable:
             {
-                ReadPtr<UProperty>();
+                ReadPtr<UnrealProperty>();
                 break;
             }
             case EX_False:
@@ -216,7 +216,7 @@ public:
                 PreProcessToken();
                 auto Skip = ReadInt32();
 
-                ReadPtr<UField>();
+                ReadPtr<UnrealProperty>();
                 PreProcessToken();
 
                 break;
@@ -248,7 +248,7 @@ public:
             }
             case EX_Let:
             {
-                ReadPtr<UProperty>();
+                ReadPtr<UnrealProperty>();
             }
             case EX_LetWeakObjPtr:
             case EX_LetObj:
@@ -326,12 +326,12 @@ public:
             }
             case EX_LocalOutVariable:
             {
-                ReadPtr<UProperty>();
+                ReadPtr<UnrealProperty>();
                 break;
             }
             case EX_LetValueOnPersistentFrame:
             {
-                ReadPtr<UProperty>()->GetFullName();
+                ReadPtr<UnrealProperty>()->GetFullName();
                 PreProcessToken();
                 break;
             }
@@ -355,7 +355,7 @@ public:
             }
             case EX_StructMemberContext:
             {
-                ReadPtr<UProperty>();
+                ReadPtr<UnrealProperty>();
                 PreProcessToken();
                 break;
             }
@@ -368,7 +368,7 @@ public:
             }
             case EX_ArrayConst:
             {
-                ReadPtr<UProperty>();
+                ReadPtr<UnrealProperty>();
                 ReadInt32();
                 while (PreProcessToken() != EX_EndArrayConst) { }
                 break;
@@ -487,7 +487,7 @@ public:
             }
             case EX_DefaultVariable:
             {
-                ReadPtr<UProperty>();
+                ReadPtr<UnrealProperty>();
                 break;
             }
             case EX_ClearMulticastDelegate:
@@ -559,7 +559,7 @@ public:
             case EX_InstanceVariable:
             case EX_LocalVariable:
             {
-                auto Prop = ReadPtr<UProperty>();
+                auto Prop = ReadPtr<UnrealProperty>();
 
                 Out += Prop->GetName();
 
@@ -624,7 +624,7 @@ public:
                 Out += "->";
 
                 auto Skip = ReadInt32();
-                auto Field = ReadPtr<UField>();
+                auto Field = ReadPtr<UnrealProperty>();
 
                 ProcessToken(true);
 
@@ -670,7 +670,7 @@ LetLogic:
             }
             case EX_Let:
             {
-                auto Prop = ReadPtr<UProperty>();
+                auto Prop = ReadPtr<UnrealProperty>();
                 // OutLine("EX_Let ({})", Prop->GetFullName());
                 goto LetLogic;
             }
@@ -739,7 +739,7 @@ LetLogic:
             }
             case EX_LetValueOnPersistentFrame:
             {
-                Out += std::format("{} = ", ReadPtr<UProperty>()->GetName());
+                Out += std::format("{} = ", ReadPtr<UnrealProperty>()->GetName());
                 ProcessToken();
 
                 break;
@@ -772,13 +772,13 @@ LetLogic:
             }
             case EX_StructMemberContext:
             {
-                auto Prop = ReadPtr<UProperty>();
+                auto Prop = ReadPtr<UnrealProperty>();
                 ProcessToken();
                 Out += std::format(".{}", Prop->GetName());
                 // OutLine("EX_StructMemberContext");
 
                 // AddIndent();
-                // OutLine("// Var ({})", ReadPtr<UProperty>()->GetFullName());
+                // OutLine("// Var ({})", ReadPtr<UnrealProperty>()->GetFullName());
                 // OutLine("");
                 // OutLine("// Expr");
                 // ProcessToken();
@@ -801,7 +801,7 @@ LetLogic:
             }
             case EX_ArrayConst:
             {
-                auto Prop = ReadPtr<UProperty>();
+                auto Prop = ReadPtr<UnrealProperty>();
                 Out += std::format("TArray<{}, {}>([", Prop->GetCPPType(), ReadInt32());
                 while (ProcessToken() != EX_EndArrayConst)
                 {
@@ -959,7 +959,7 @@ LetLogic:
             }
             case EX_DefaultVariable:
             {
-                OutLine("EX_DefaultVariable ({})", ReadPtr<UProperty>()->GetFullName());
+                OutLine("EX_DefaultVariable ({})", ReadPtr<UnrealProperty>()->GetFullName());
                 break;
             }
             case EX_ClearMulticastDelegate:
@@ -1039,10 +1039,9 @@ LetLogic:
 
         Indent();
         Out += std::format("{} {}(", rettype, Function->GetName());
-        std::vector<UProperty*> Parms;
-        for (auto Child = Function->GetChildren(); Child; Child = Child->GetNext())
+        std::vector<UnrealProperty*> Parms;
+        for (auto Prop : Function->GetProps())
         {
-            auto Prop = (UProperty*)Child;
             if (Prop->HasPropertyFlag(CPF_Parm))
             {
                 Parms.push_back(Prop);
@@ -1054,7 +1053,7 @@ LetLogic:
             if (i != Parms.size() - 1)
                 Out += ", ";
         }
-        Out += ')';
+        Out += ")\n";
         OutLine("{{");
         AddIndent();
         ScriptIndex = 0;

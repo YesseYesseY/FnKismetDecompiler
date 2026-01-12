@@ -22,9 +22,16 @@ namespace UnrealCore
         static int32 UStruct_Children = -1;
         static int32 UStruct_Size = -1;
         static int32 UStruct_Script = -1;
+        static int32 UStruct_ChildProperties = -1;
 
         static int32 UProperty_Offset = -1;
         static int32 UProperty_PropertyFlags = -1;
+
+        static int32 FField_Next = -1;
+        static int32 FField_Name = -1;
+
+        static int32 FProperty_Offset = -1;
+        static int32 FProperty_PropertyFlags = -1;
 
         static int32 UFunction_ExecFunc = -1;
         static int32 UFunction_FunctionFlags = -1;
@@ -33,6 +40,7 @@ namespace UnrealCore
     namespace UnrealOptions
     {
         static bool ChunkedObjectArray = false;
+        static bool FFields = false;
     }
 
     static inline float EngineVersion = -1.0f;
@@ -333,27 +341,7 @@ namespace UnrealCore
 
     class UProperty : public UField
     {
-    private:
-        static inline int32 GetCPPTypeIndex = -1;
     public:
-        static void Init()
-        {
-            // UProperty::GetCPPType
-            {
-                auto BaseFunc = Memcury::Scanner::FindStringRef(L"UProperty::GetCPPType").ScanFor({ 0x48, 0x89, 0x5C }, false).GetAs<void*>();
-                auto UPropertyVTable = UObject::FindObject(L"/Script/CoreUObject.Default__Property")->VTable;
-
-                for (int i = 0; i < 0x100; i++)
-                {
-                    if (UPropertyVTable[i] == BaseFunc)
-                    {
-                        GetCPPTypeIndex = i;
-                        break;
-                    }
-                }
-            }
-        }
-
         int32 GetOffset()
         {
             return GetChild<int32>(Offsets::UProperty_Offset);
@@ -376,6 +364,76 @@ namespace UnrealCore
     {
     };
 
+    class UnrealProperty
+    {
+    public:
+        std::string GetName()
+        {
+            if (!this)
+                return "None";
+
+            if (UnrealOptions::FFields)
+            {
+                FName name = *(FName*)(int64(this) + Offsets::FField_Name);
+                return name.ToString();
+            }
+
+            FName name = *(FName*)(int64(this) + Offsets::UObject_NamePrivate);
+            return name.ToString();
+        }
+
+        std::string GetFullName()
+        {
+            if (!this)
+                return "None";
+
+            if (UnrealOptions::FFields)
+            {
+                // TODO
+                return GetName();
+            }
+
+            return ((UObject*)this)->GetFullName();
+        }
+
+        UnrealProperty* GetNext()
+        {
+            if (UnrealOptions::FFields)
+                return *(UnrealProperty**)(int64(this) + Offsets::FField_Next);
+
+            return *(UnrealProperty**)(int64(this) + Offsets::UField_Next);
+        }
+
+        int32 GetOffset()
+        {
+            if (UnrealOptions::FFields)
+                return *(int32*)(int64(this) + Offsets::FProperty_Offset);
+
+            return *(int32*)(int64(this) + Offsets::UProperty_Offset);
+        }
+
+        EPropertyFlags GetPropertyFlags()
+        {
+            if (UnrealOptions::FFields)
+                return *(EPropertyFlags*)(int64(this) + Offsets::FProperty_PropertyFlags);
+
+            return *(EPropertyFlags*)(int64(this) + Offsets::UProperty_PropertyFlags);
+        }
+
+        bool HasPropertyFlag(EPropertyFlags Flag)
+        {
+            return (GetPropertyFlags() & Flag) != CPF_None;
+        }
+
+        std::string GetCPPType()
+        {
+            if (UnrealOptions::FFields)
+                return "void /*TODO*/";
+
+            return ((UProperty*)this)->GetCPPType();
+        }
+    };
+
     class UStruct : public UField
     {
     public:
@@ -387,6 +445,11 @@ namespace UnrealCore
         UField* GetChildren()
         {
             return GetChild<UField*>(Offsets::UStruct_Children);
+        }
+
+        UnrealProperty* GetChildProperties()
+        {
+            return GetChild<UnrealProperty*>(Offsets::UStruct_ChildProperties);
         }
 
         int32 GetSize()
@@ -413,41 +476,66 @@ namespace UnrealCore
             return false;
         }
 
-        int32 GetChildOffset(const std::string& Name)
+        std::vector<UFunction*> GetFuncs()
         {
             static auto FunctionClass = UObject::FindClass(L"/Script/CoreUObject.Function");
+
+            std::vector<UFunction*> ret;
             for (auto Struct = this; Struct; Struct = Struct->GetSuperStruct())
             {
                 for (auto Child = Struct->GetChildren(); Child; Child = Child->GetNext())
                 {
                     if (Child->IsA(FunctionClass))
-                        continue;
-
-                    if (Child->GetName() == Name)
-                        return ((UProperty*)Child)->GetOffset();
+                    {
+                        ret.push_back((UFunction*)Child);
+                    }
                 }
+            }
+            return ret;
+        }
+
+        std::vector<UnrealProperty*> GetProps()
+        {
+            std::vector<UnrealProperty*> ret;
+
+            if (UnrealOptions::FFields)
+            {
+                for (auto Struct = this; Struct; Struct = Struct->GetSuperStruct())
+                {
+                    for (auto Child = Struct->GetChildProperties(); Child; Child = Child->GetNext())
+                    {
+                        ret.push_back((UnrealProperty*)Child);
+                    }
+                }
+            }
+            else
+            {
+                static auto PropertyClass = UObject::FindClass(L"/Script/CoreUObject.Property");
+                for (auto Struct = this; Struct; Struct = Struct->GetSuperStruct())
+                {
+                    for (auto Child = Struct->GetChildren(); Child; Child = Child->GetNext())
+                    {
+                        if (Child->IsA(PropertyClass))
+                            ret.push_back((UnrealProperty*)Child);
+                    }
+                }
+            }
+
+            return ret;
+        }
+
+        int32 GetChildOffset(const std::string& Name)
+        {
+            for (auto Prop : GetProps())
+            {
+                if (Prop->GetName() == Name)
+                    return Prop->GetOffset();
             }
 
             return -1;
         }
 
-        UFunction* GetChildFunction(const std::string& Name)
-        {
-            static auto FunctionClass = UObject::FindClass(L"/Script/CoreUObject.Function");
-            for (auto Struct = this; Struct; Struct = Struct->GetSuperStruct())
-            {
-                for (auto Child = Struct->GetChildren(); Child; Child = Child->GetNext())
-                {
-                    if (!Child->IsA(FunctionClass))
-                        continue;
-
-                    if (Child->GetName() == Name)
-                        return (UFunction*)Child;
-                }
-            }
-
-            return nullptr;
-        }
+        UFunction* GetChildFunction(const std::string& Name);
     };
 
     class UClass : public UStruct
@@ -472,14 +560,10 @@ namespace UnrealCore
             return (GetFunctionFlags() & Flag) != EFunctionFlags::FUNC_None;
         }
 
-        UProperty* GetReturnProp()
+        UnrealProperty* GetReturnProp()
         {
-            static auto FunctionClass = FindClass(L"/Script/CoreUObject.Function");
-            for (auto Child = GetChildren(); Child; Child = Child->GetNext())
+            for (auto Prop : GetProps())
             {
-                if (Child->IsA(FunctionClass)) continue; // This shouldn't be needed... i think... 99% sure
-
-                auto Prop = (UProperty*)Child;
                 if (Prop->HasPropertyFlag(CPF_ReturnParm))
                 {
                     return Prop;
@@ -677,12 +761,22 @@ namespace UnrealCore
         return "void /*TODO*/";
     }
 
+    UFunction* UStruct::GetChildFunction(const std::string& Name)
+    {
+        for (auto Func : GetFuncs())
+        {
+            if (Func->GetName() == Name)
+                return Func;
+        }
+
+        return nullptr;
+    }
+
 
 
     static void InitUnrealCore()
     {
         UObject::Init();
-        UProperty::Init();
 
         // FMemory::Realloc
         {
@@ -710,6 +804,7 @@ namespace UnrealCore
         }
 
         UnrealOptions::ChunkedObjectArray = EngineVersion >= 4.22f; // TODO Check 4.21
+        UnrealOptions::FFields = EngineVersion >= 4.25f;
 
         Offsets::UObject_ObjectFlags = 0x8;
         Offsets::UObject_Class = 0x10;
@@ -724,6 +819,11 @@ namespace UnrealCore
 
         Offsets::UStruct_Children = Offsets::UStruct_SuperStruct + 0x8;
         Offsets::UStruct_Size = Offsets::UStruct_Children + 0x8;
+        if (UnrealOptions::FFields)
+        {
+            Offsets::UStruct_ChildProperties = Offsets::UStruct_Children + 0x8;
+            Offsets::UStruct_Size += 0x8;
+        }
         Offsets::UStruct_Script = Offsets::UStruct_Size + 0x8;
 
         Offsets::UProperty_PropertyFlags = 0x38;
@@ -731,10 +831,15 @@ namespace UnrealCore
 
         auto StructClass = UObject::FindClass(L"/Script/CoreUObject.Struct");
         Offsets::UFunction_FunctionFlags = StructClass->GetSize();
+        Offsets::UFunction_ExecFunc = Offsets::UFunction_FunctionFlags + 0x28;
 
-        Offsets::UFunction_ExecFunc = 0xB0;
-        if (EngineVersion >= 4.22f) // From UStruct
-            Offsets::UFunction_ExecFunc += 0x10;
+        if (UnrealOptions::FFields)
+        {
+            Offsets::FField_Next = 0x20;
+            Offsets::FField_Name = Offsets::FField_Next + 0x8;
 
+            Offsets::FProperty_PropertyFlags = 0x40;
+            Offsets::FProperty_Offset = Offsets::FProperty_PropertyFlags + 0xC;
+        }
     }
 }

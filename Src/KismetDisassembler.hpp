@@ -262,6 +262,7 @@ public:
     EExprToken ProcessToken()
     {
         EExprToken Token = (EExprToken)Script[ScriptIndex++];
+        // MessageBox("0x{:X}", (uint8)Token); // Thank you wine console
         std::println("0x{:X}", (uint8)Token);
         switch (Token)
         {
@@ -283,7 +284,7 @@ public:
             }
             case EX_LocalVariable:
             {
-                auto Prop = ReadPtr<UProperty>();
+                auto Prop = ReadPtr<UnrealProperty>();
 
                 OutLine("EX_LocalVariable ({})", Prop->GetFullName());
 
@@ -309,7 +310,7 @@ public:
             }
             case EX_InstanceVariable:
             {
-                auto Prop = ReadPtr<UProperty>();
+                auto Prop = ReadPtr<UnrealProperty>();
 
                 OutLine("EX_InstanceVariable ({})", Prop->GetFullName());
                 break;
@@ -378,7 +379,7 @@ ContextLogic:
                 ProcessToken();
                 OutLine("// Skip ({})\n", ReadInt32());
 
-                auto Field = ReadPtr<UField>();
+                auto Field = ReadPtr<UnrealProperty>();
                 OutLine("// Thing ({})\n", Field ? Field->GetFullName() : "Null");
 
                 OutLine("// Thing2");
@@ -438,7 +439,7 @@ ContextLogic:
             case EX_Let:
             {
                 {
-                    auto Prop = ReadPtr<UProperty>();
+                    auto Prop = ReadPtr<UnrealProperty>();
                     OutLine("EX_Let ({})", Prop->GetFullName());
                 }
 
@@ -533,7 +534,7 @@ LetLogic:
             }
             case EX_LocalOutVariable:
             {
-                OutLine("EX_LocalOutVariable ({})", ReadPtr<UProperty>()->GetFullName());
+                OutLine("EX_LocalOutVariable ({})", ReadPtr<UnrealProperty>()->GetFullName());
                 break;
             }
             case EX_LetValueOnPersistentFrame:
@@ -541,7 +542,7 @@ LetLogic:
                 OutLine("EX_LetValueOnPersistentFrame");
 
                 AddIndent();
-                OutLine("// Var ({})", ReadPtr<UProperty>()->GetFullName());
+                OutLine("// Var ({})", ReadPtr<UnrealProperty>()->GetFullName());
                 OutLine("");
                 OutLine("// Expr");
                 ProcessToken();
@@ -586,7 +587,7 @@ LetLogic:
                 OutLine("EX_StructMemberContext");
 
                 AddIndent();
-                OutLine("// Var ({})", ReadPtr<UProperty>()->GetFullName());
+                OutLine("// Var ({})", ReadPtr<UnrealProperty>()->GetFullName());
                 OutLine("");
                 OutLine("// Expr");
                 ProcessToken();
@@ -611,7 +612,7 @@ LetLogic:
             }
             case EX_ArrayConst:
             {
-                auto Prop = ReadPtr<UProperty>();
+                auto Prop = ReadPtr<UnrealProperty>();
                 OutLine("EX_ArrayConst (Size: {}) ({})", ReadInt32(), Prop->GetFullName());
                 AddIndent();
                 while (ProcessToken() != EX_EndArrayConst) { }
@@ -766,7 +767,7 @@ LetLogic:
             }
             case EX_DefaultVariable:
             {
-                OutLine("EX_DefaultVariable ({})", ReadPtr<UProperty>()->GetFullName());
+                OutLine("EX_DefaultVariable ({})", ReadPtr<UnrealProperty>()->GetFullName());
                 break;
             }
             case EX_ClearMulticastDelegate:
