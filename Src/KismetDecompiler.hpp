@@ -54,6 +54,11 @@ public:
         return ReadBasic<float>();
     }
 
+    float ReadDouble()
+    {
+        return ReadBasic<double>();
+    }
+
     std::string ReadName()
     {
         auto ret = ((FScriptName*)(&Script[ScriptIndex]))->ToString();
@@ -270,6 +275,11 @@ public:
                 ReadFloat();
                 break;
             }
+            case EX_DoubleConst:
+            {
+                ReadDouble();
+                break;
+            }
             case EX_Jump:
             {
                 Labels[CurrentFunc].push_back(ReadInt32());
@@ -302,16 +312,34 @@ public:
             }
             case EX_RotationConst:
             {
-                ReadFloat();
-                ReadFloat();
-                ReadFloat();
+                if (UnrealOptions::Doubles)
+                {
+                    ReadDouble();
+                    ReadDouble();
+                    ReadDouble();
+                }
+                else
+                {
+                    ReadFloat();
+                    ReadFloat();
+                    ReadFloat();
+                }
                 break;
             }
             case EX_VectorConst:
             {
-                ReadFloat();
-                ReadFloat();
-                ReadFloat();
+                if (UnrealOptions::Doubles)
+                {
+                    ReadDouble();
+                    ReadDouble();
+                    ReadDouble();
+                }
+                else
+                {
+                    ReadFloat();
+                    ReadFloat();
+                    ReadFloat();
+                }
                 break;
             }
             case EX_ByteConst:
@@ -379,16 +407,32 @@ public:
             }
             case EX_TransformConst:
             {
-                ReadFloat();
-                ReadFloat(); 
-                ReadFloat();
-                ReadFloat();
-                ReadFloat();
-                ReadFloat(); 
-                ReadFloat();
-                ReadFloat();
-                ReadFloat();
-                ReadFloat();
+                if (UnrealOptions::Doubles)
+                {
+                    ReadDouble();
+                    ReadDouble();
+                    ReadDouble();
+                    ReadDouble();
+                    ReadDouble();
+                    ReadDouble();
+                    ReadDouble();
+                    ReadDouble();
+                    ReadDouble();
+                    ReadDouble();
+                }
+                else
+                {
+                    ReadFloat();
+                    ReadFloat(); 
+                    ReadFloat();
+                    ReadFloat();
+                    ReadFloat();
+                    ReadFloat(); 
+                    ReadFloat();
+                    ReadFloat();
+                    ReadFloat();
+                    ReadFloat();
+                }
                 break;
             }
             case EX_SkipOffsetConst:
@@ -679,6 +723,11 @@ LetLogic:
                 Out += std::format("{:#.0f}f", ReadFloat());
                 break;
             }
+            case EX_DoubleConst:
+            {
+                Out += std::format("{:#.0f}d", ReadDouble());
+                break;
+            }
             case EX_Jump:
             {
                 Out += std::format("goto Label_{}", ReadInt32());
@@ -719,12 +768,18 @@ LetLogic:
             }
             case EX_RotationConst:
             {
-                Out += std::format("FRotator({:#.0f}f, {:#.0f}f, {:#.0f}f)", ReadFloat(), ReadFloat(), ReadFloat());
+                if (UnrealOptions::Doubles)
+                    Out += std::format("FRotator({:#.0f}d, {:#.0f}d, {:#.0f}d)", ReadDouble(), ReadDouble(), ReadDouble());
+                else
+                    Out += std::format("FRotator({:#.0f}f, {:#.0f}f, {:#.0f}f)", ReadFloat(), ReadFloat(), ReadFloat());
                 break;
             }
             case EX_VectorConst:
             {
-                Out += std::format("FVector({:#.0f}f, {:#.0f}f, {:#.0f}f)", ReadFloat(), ReadFloat(), ReadFloat());
+                if (UnrealOptions::Doubles)
+                    Out += std::format("FVector({:#.0f}d, {:#.0f}d, {:#.0f}d)", ReadDouble(), ReadDouble(), ReadDouble());
+                else
+                    Out += std::format("FVector({:#.0f}f, {:#.0f}f, {:#.0f}f)", ReadFloat(), ReadFloat(), ReadFloat());
                 break;
             }
             case EX_ByteConst:
@@ -824,15 +879,18 @@ LetLogic:
             }
             case EX_TransformConst:
             {
-                Out += std::format("FTransform(FVector({:#.0f}f, {:#.0f}f, {:#.0f}f), FQuat({:#.0f}f, {:#.0f}f, {:#.0f}f, {:#.0f}f), FVector({:#.0f}f, {:#.0f}f, {:#.0f}f))",
-                        ReadFloat(), ReadFloat(), ReadFloat(),
-                        ReadFloat(), ReadFloat(), ReadFloat(), ReadFloat(),
-                        ReadFloat(), ReadFloat(), ReadFloat());
-                // OutLine("EX_TransformConst Rot ({}, {}, {}, {}), Pos ({}, {}, {}), Size ({}, {}, {})",
-                //         ReadFloat(), ReadFloat(), ReadFloat(), ReadFloat(),
-                //         ReadFloat(), ReadFloat(), ReadFloat(),
-                //         ReadFloat(), ReadFloat(), ReadFloat()
-                //         );
+                if (UnrealOptions::Doubles)
+                {
+                    Out += std::format("FTransform(FVector({:#.0f}d, {:#.0f}d, {:#.0f}d), FQuat({:#.0f}d, {:#.0f}d, {:#.0f}d, {:#.0f}d), FVector({:#.0f}d, {:#.0f}d, {:#.0f}d))", ReadDouble(), ReadDouble(), ReadDouble(),
+                          ReadDouble(), ReadDouble(), ReadDouble(), ReadDouble(),
+                          ReadDouble(), ReadDouble(), ReadDouble());
+                }
+                else
+                {
+                    Out += std::format("FTransform(FVector({:#.0f}f, {:#.0f}f, {:#.0f}f), FQuat({:#.0f}f, {:#.0f}f, {:#.0f}f, {:#.0f}f), FVector({:#.0f}f, {:#.0f}f, {:#.0f}f))", ReadFloat(), ReadFloat(), ReadFloat(),
+                          ReadFloat(), ReadFloat(), ReadFloat(), ReadFloat(),
+                          ReadFloat(), ReadFloat(), ReadFloat());
+                }
                 break;
             }
             case EX_SkipOffsetConst:

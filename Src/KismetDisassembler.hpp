@@ -203,6 +203,11 @@ public:
         return ReadBasic<float>();
     }
 
+    float ReadDouble()
+    {
+        return ReadBasic<double>();
+    }
+
     std::string ReadName()
     {
         auto ret = ((FScriptName*)(&Script[ScriptIndex]))->ToString();
@@ -468,6 +473,12 @@ LetLogic:
                 OutLine("EX_FloatConst ({}f)", Float);
                 break;
             }
+            case EX_DoubleConst:
+            {
+                auto Double = ReadDouble();
+                OutLine("EX_DoubleConst ({}d)", Double);
+                break;
+            }
             case EX_Jump:
             {
                 auto Skip = ReadInt32();
@@ -514,12 +525,26 @@ LetLogic:
             }
             case EX_RotationConst:
             {
-                OutLine("EX_RotationConst ({}, {}, {})", ReadFloat(), ReadFloat(), ReadFloat());
+                if (UnrealOptions::Doubles)
+                {
+                    OutLine("EX_RotationConst ({}, {}, {})", ReadDouble(), ReadDouble(), ReadDouble());
+                }
+                else
+                {
+                    OutLine("EX_RotationConst ({}, {}, {})", ReadFloat(), ReadFloat(), ReadFloat());
+                }
                 break;
             }
             case EX_VectorConst:
             {
-                OutLine("EX_VectorConst ({}, {}, {})", ReadFloat(), ReadFloat(), ReadFloat());
+                if (UnrealOptions::Doubles)
+                {
+                    OutLine("EX_VectorConst ({}, {}, {})", ReadDouble(), ReadDouble(), ReadDouble());
+                }
+                else
+                {
+                    OutLine("EX_VectorConst ({}, {}, {})", ReadFloat(), ReadFloat(), ReadFloat());
+                }
                 break;
             }
             case EX_ByteConst:
@@ -626,11 +651,22 @@ LetLogic:
             }
             case EX_TransformConst:
             {
-                OutLine("EX_TransformConst Rot ({}, {}, {}, {}), Pos ({}, {}, {}), Size ({}, {}, {})",
-                        ReadFloat(), ReadFloat(), ReadFloat(), ReadFloat(),
-                        ReadFloat(), ReadFloat(), ReadFloat(),
-                        ReadFloat(), ReadFloat(), ReadFloat()
-                        );
+                if (UnrealOptions::Doubles)
+                {
+                    OutLine("EX_TransformConst Rot ({}, {}, {}, {}), Pos ({}, {}, {}), Size ({}, {}, {})",
+                            ReadDouble(), ReadDouble(), ReadDouble(), ReadDouble(),
+                            ReadDouble(), ReadDouble(), ReadDouble(),
+                            ReadDouble(), ReadDouble(), ReadDouble()
+                            );
+                }
+                else
+                {
+                    OutLine("EX_TransformConst Rot ({}, {}, {}, {}), Pos ({}, {}, {}), Size ({}, {}, {})",
+                            ReadFloat(), ReadFloat(), ReadFloat(), ReadFloat(),
+                            ReadFloat(), ReadFloat(), ReadFloat(),
+                            ReadFloat(), ReadFloat(), ReadFloat()
+                            );
+                }
                 break;
             }
             case EX_SkipOffsetConst:

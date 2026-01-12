@@ -41,6 +41,7 @@ namespace UnrealCore
     {
         static bool ChunkedObjectArray = false;
         static bool FFields = false;
+        static bool Doubles = false;
     }
 
     static inline float EngineVersion = -1.0f;
@@ -183,8 +184,13 @@ namespace UnrealCore
         {
             // StaticFindObject
             {
+                // TODO There's easier ways to get this than just spamming patterns
+
                 // 18.40
                 auto Addr = Memcury::Scanner::FindPattern("48 89 5C 24 ? 48 89 74 24 ? 48 89 7C 24 ? 55 41 54 41 55 41 56 41 57 48 8B EC 48 83 EC 60 45 33 ED 45 8A F9").Get();
+
+                if (!Addr) // 19.40
+                    Addr = Memcury::Scanner::FindPattern("48 89 5C 24 ? 48 89 74 24 ? 4C 89 64 24 ? 55 41 55 41 57 48 8B EC 48 83 EC 50 4C 8B E9").Get();
 
                 if (!Addr) // 4.1 to 14.60
                     Addr = Memcury::Scanner::FindStringRef(L"Illegal call to StaticFindObject() while serializing object data!").ScanFor({ 0x48, 0x89, 0x5C }, false).Get();
@@ -201,6 +207,9 @@ namespace UnrealCore
                 if (!Addr) // 18.40
                     Addr = Memcury::Scanner::FindPattern("40 55 53 56 57 41 54 41 56 41 57 48 81 EC 40 01 00 00").Get();
 
+                if (!Addr) // 19.40
+                    Addr = Memcury::Scanner::FindPattern("40 55 53 56 57 41 54 41 56 41 57 48 81 EC F0 00 00 00").Get();
+
                 CheckAddr("Failed to find ProcessEvent");
 
                 ProcessEventNative = decltype(ProcessEventNative)(Addr);
@@ -212,7 +221,7 @@ namespace UnrealCore
                 auto Addr = Memcury::Scanner::FindPattern("48 8B 05 ? ? ? ? 48 8D 0C 49 48 8D 14 C8 EB ? 48 8B D3 8B 42 ? C1 E8 1D A8 01 74").RelativeOffset(3).Get();
 
                 if (!Addr) // 7.30 and 18.40  -  Can be used for 4.1 aswell if scanning for 48 8B 0D
-                    Addr = Memcury::Scanner::FindStringRef(L"Material=").ScanFor({ 0x48, 0x8b, 0x05 }).RelativeOffset(3).Get();
+                    Addr = Memcury::Scanner::FindStringRef(L"Material=").ScanFor({ 0x48, 0x8B, 0x05 }).RelativeOffset(3).Get();
 
                 // if (!Addr)
                 //     Addr = Memcury::Scanner::FindStringRef(L"SubmitRemoteVoiceData(%s) Size: %d received!").ScanFor({ 0x48, 0x8B, 0x05 }, true, 1).RelativeOffset(3).Get();
@@ -792,6 +801,9 @@ namespace UnrealCore
             // 4.1
             auto Addr = Memcury::Scanner::FindPattern("4C 8B D1 48 8B 0D ? ? ? ? 48 85 C9 75 ? 49 8B CA").GetAs<void*>();
 
+            if (!Addr)
+                Addr = Memcury::Scanner::FindPattern("48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC 20 48 8B F1 41 8B D8 48 8B 0D ? ? ? ? E8").GetAs<void*>();
+
             if (!Addr) // 7.30
                 Addr = Memcury::Scanner::FindPattern("48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC 20 48 8B F1 41 8B D8 48 8B 0D").GetAs<void*>();
 
@@ -807,6 +819,7 @@ namespace UnrealCore
             FString Ver;
             SystemLib->ProcessEvent(Func, &Ver);
             auto VerStr = Ver.ToString();
+            UnrealMessageBox("{}", VerStr);
             Ver.Free();
             EngineVersion = std::stof(VerStr);
             GameVersion = std::stof(VerStr.substr(VerStr.find_last_of('-') + 1));
@@ -814,6 +827,7 @@ namespace UnrealCore
 
         UnrealOptions::ChunkedObjectArray = EngineVersion >= 4.22f; // TODO Check 4.21
         UnrealOptions::FFields = EngineVersion >= 4.25f;
+        UnrealOptions::Doubles = GameVersion >= 20.0f;
 
         Offsets::UObject_ObjectFlags = 0x8;
         Offsets::UObject_Class = 0x10;
