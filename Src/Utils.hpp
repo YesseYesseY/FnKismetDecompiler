@@ -1,6 +1,3 @@
-#include <UnrealCore.hpp>
-using namespace UnrealCore;
-
 namespace Utils
 {
     void DumpObjects()

@@ -12,6 +12,9 @@ Versions below the unreal versions are fortnite builds i've tested it on
    - 10.40
  - UE4.25 - Supported
    - 12.41
+ - UE4.26 - Supported
+   - 14.60
+   - 18.40
  - Everything else = Not tested
 
 # Goal

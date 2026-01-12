@@ -183,8 +183,11 @@ namespace UnrealCore
         {
             // StaticFindObject
             {
-                // ScanFor bytes will probably change
-                auto Addr = Memcury::Scanner::FindStringRef(L"Illegal call to StaticFindObject() while serializing object data!").ScanFor({ 0x48, 0x89, 0x5C }, false).Get();
+                // 18.40
+                auto Addr = Memcury::Scanner::FindPattern("48 89 5C 24 ? 48 89 74 24 ? 48 89 7C 24 ? 55 41 54 41 55 41 56 41 57 48 8B EC 48 83 EC 60 45 33 ED 45 8A F9").Get();
+
+                if (!Addr) // 4.1 to 14.60
+                    Addr = Memcury::Scanner::FindStringRef(L"Illegal call to StaticFindObject() while serializing object data!").ScanFor({ 0x48, 0x89, 0x5C }, false).Get();
 
                 CheckAddr("Failed to find StaticFindObject");
 
@@ -194,6 +197,9 @@ namespace UnrealCore
             // ProcessEvent
             {
                 auto Addr = Memcury::Scanner::FindPattern("40 55 56 57 41 54 41 55 41 56 41 57 48 81 EC F0 00 00 00").Get();
+
+                if (!Addr) // 18.40
+                    Addr = Memcury::Scanner::FindPattern("40 55 53 56 57 41 54 41 56 41 57 48 81 EC 40 01 00 00").Get();
 
                 CheckAddr("Failed to find ProcessEvent");
 
@@ -205,8 +211,11 @@ namespace UnrealCore
                 // 4.1
                 auto Addr = Memcury::Scanner::FindPattern("48 8B 05 ? ? ? ? 48 8D 0C 49 48 8D 14 C8 EB ? 48 8B D3 8B 42 ? C1 E8 1D A8 01 74").RelativeOffset(3).Get();
 
-                if (!Addr)
-                    Addr = Memcury::Scanner::FindStringRef(L"SubmitRemoteVoiceData(%s) Size: %d received!").ScanFor({ 0x48, 0x8B, 0x05 }, true, 1).RelativeOffset(3).Get();
+                if (!Addr) // 7.30 and 18.40  -  Can be used for 4.1 aswell if scanning for 48 8B 0D
+                    Addr = Memcury::Scanner::FindStringRef(L"Material=").ScanFor({ 0x48, 0x8b, 0x05 }).RelativeOffset(3).Get();
+
+                // if (!Addr)
+                //     Addr = Memcury::Scanner::FindStringRef(L"SubmitRemoteVoiceData(%s) Size: %d received!").ScanFor({ 0x48, 0x8B, 0x05 }, true, 1).RelativeOffset(3).Get();
 
                 CheckAddr("Failed to find Objects");
 

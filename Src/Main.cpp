@@ -13,6 +13,7 @@ using namespace UnrealCore;
 // #define SEARCH_FOR_UNKNOWNS
 #include "KismetDisassembler.hpp"
 #include "KismetDecompiler.hpp"
+#include "Utils.hpp"
 
 DWORD MainThread(HMODULE Module)
 {
@@ -27,6 +28,11 @@ DWORD MainThread(HMODULE Module)
     // auto Func = UObject::FindFunction(L"/Game/Athena/SupplyDrops/BP_DamageBalloon_Athena.BP_DamageBalloon_Athena_C:ExecuteUbergraph_BP_DamageBalloon_Athena");
     // auto Class = UObject::FindClass(L"/Game/Athena/PlayerPawn_Athena.PlayerPawn_Athena_C");
     // auto BlueprintGeneratedClassClass = UObject::FindClass(L"/Script/Engine.BlueprintGeneratedClass");
+
+    // MessageBox("{}", EngineVersion);
+#if 1
+    Utils::DumpObjects();
+#endif
 
 #ifdef SEARCH_FOR_UNKNOWNS
 #if 1
