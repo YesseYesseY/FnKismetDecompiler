@@ -1,3 +1,20 @@
+// Formats TMap<>
+// Example:
+// TMap<int32, int32>({ 23: 45, 76: 42})
+// to
+// TMap<int32, int32>({
+//     23: 45
+//     76: 42
+// })
+#define FormatMaps 1
+
+// Parses static funcs such as UKismetMathLibrary::Add_FloatFloat
+// Example:
+// CallFunc_Add_FloatFloat_ReturnValue_1 = UKismetMathLibrary::Add_FloatFloat(localaccumulator.SecondaryDamage_32_EB6925F04B8C5CA1EA314ABBC9C1B68F, CallFunc_SelectFloat_ReturnValue);
+// to
+// CallFunc_Add_FloatFloat_ReturnValue_1 = localaccumulator.SecondaryDamage_32_EB6925F04B8C5CA1EA314ABBC9C1B68F + CallFunc_SelectFloat_ReturnValue;
+#define ParseStaticFuncs 1
+
 class KismetDecompiler
 {
 private:
@@ -152,6 +169,28 @@ public:
                 ReadPtr<UnrealProperty>();
                 break;
             }
+            case EX_FieldPathConst:
+            {
+                PreProcessToken();
+                break;
+            }
+            case EX_MapConst:
+            {
+                auto Key = ReadPtr<UnrealProperty>();
+                auto Val = ReadPtr<UnrealProperty>();
+                auto Num = ReadInt32();
+                for (int i = 0; i < Num; i++)
+                {
+                    PreProcessToken();
+                    PreProcessToken();
+                }
+                PreProcessToken();
+                break;
+            }
+            case EX_EndMapConst:
+            {
+                break;
+            }
             case EX_LocalFinalFunction:
             case EX_FinalFunction:
             {
@@ -257,6 +296,7 @@ public:
             }
             case EX_LetWeakObjPtr:
             case EX_LetObj:
+            case EX_LetDelegate:
             case EX_LetBool:
             {
 
@@ -616,11 +656,62 @@ public:
             {
                 auto Func = ReadPtr<UFunction>();
 
-                if (!CalledFromContext && Func->HasFunctionFlag(EFunctionFlags::FUNC_Static))
-                    Out += std::format("{}::", Func->GetOuter()->GetCPPName());
-                Out += std::format("{}(", Func->GetName());
-                ArgsLoop();
-                Out += ")";
+                bool StaticParsed = false;
+#if ParseStaticFuncs
+                // UKismetSystemLibrary::IsValid
+                // UKismetMathLibrary::Conv_*
+
+#define BasicStaticMathOp(Operation) { StaticParsed = true; ProcessToken(); Out += " " Operation " "; ProcessToken(); }
+
+                static auto MathLibClass = UObject::FindClass(L"/Script/Engine.KismetMathLibrary");
+                auto FuncName = Func->GetName();
+                if (Func->GetOuter() == MathLibClass)
+                {
+                    if (FuncName.starts_with("Add_")) BasicStaticMathOp("+")
+                    else if (FuncName.starts_with("Multiply_")) BasicStaticMathOp("*")
+                    else if (FuncName.starts_with("Less_")) BasicStaticMathOp("<")
+                    else if (FuncName.starts_with("LessEqual_")) BasicStaticMathOp("<=")
+                    else if (FuncName.starts_with("Greater_")) BasicStaticMathOp(">")
+                    else if (FuncName.starts_with("GreaterEqual_")) BasicStaticMathOp(">=")
+                    else if (FuncName.starts_with("EqualEqual_")) BasicStaticMathOp("==")
+                    else if (FuncName.starts_with("NotEqual_")) BasicStaticMathOp("!=")
+                    else if (FuncName == "BooleanAND") BasicStaticMathOp("&&")
+                    else if (FuncName == "BooleanOR") BasicStaticMathOp("||")
+                    else if (FuncName == "Not_PreBool")
+                    {
+                        StaticParsed = true;
+                        Out += "!";
+                        ProcessToken();
+                    }
+                    else if (FuncName.starts_with("Select"))
+                    {
+                        StaticParsed = true;
+                        int32 CurrIndex = ScriptIndex;
+                        PreProcessToken();
+                        PreProcessToken();
+                        ProcessToken();
+                        Out += " ? ";
+                        ScriptIndex = CurrIndex;
+                        ProcessToken();
+                        Out += " : ";
+                        ProcessToken();
+                        PreProcessToken();
+                    }
+                }
+#endif
+
+                if (!StaticParsed)
+                {
+                    if (!CalledFromContext && Func->HasFunctionFlag(EFunctionFlags::FUNC_Static))
+                        Out += std::format("{}::", Func->GetOuter()->GetCPPName());
+                    Out += std::format("{}(", Func->GetName());
+                    ArgsLoop();
+                    Out += ")";
+                }
+                else
+                {
+                    ProcessToken(); // EX_EndFunctionParms
+                }
 
                 break;
             }
@@ -686,6 +777,7 @@ public:
                 auto Size = ReadInt32();
                 Out += std::format("{}(", Struct->GetCPPName());
                 ArgsLoop(EX_EndStructConst);
+                Out += ')';
                 break;
             }
             case EX_EndStructConst:
@@ -704,6 +796,7 @@ public:
             }
             case EX_LetWeakObjPtr:
             case EX_LetObj:
+            case EX_LetDelegate:
             case EX_LetBool:
             {
 LetLogic:
@@ -715,7 +808,6 @@ LetLogic:
             case EX_Let:
             {
                 auto Prop = ReadPtr<UnrealProperty>();
-                // OutLine("EX_Let ({})", Prop->GetFullName());
                 goto LetLogic;
             }
             case EX_FloatConst:
@@ -1061,15 +1153,58 @@ LetLogic:
             }
             case EX_EndMap:
             {
-                OutLine("EX_EndMap");
                 break;
             }
             case EX_SoftObjectConst:
             {
-                OutLine("EX_SoftObjectConst");
-                AddIndent();
+                Out += "TSoftObjectPtr(";
                 ProcessToken();
+                Out += ')';
+                break;
+            }
+            case EX_FieldPathConst:
+            {
+                Out += "TFieldPath(";
+                ProcessToken();
+                Out += ')';
+                break;
+            }
+            case EX_MapConst:
+            {
+                auto Key = ReadPtr<UnrealProperty>();
+                auto Val = ReadPtr<UnrealProperty>();
+                Out += std::format("TMap<{}, {}>({{", Key->GetCPPType(), Val->GetCPPType());
+#if FormatMaps
+                AddIndent();
+#else
+                Out += ' ';
+#endif
+                auto Num = ReadInt32();
+                for (int i = 0; i < Num; i++)
+                {
+#if FormatMaps
+                    Out += '\n';
+                    Indent();
+#endif
+                    ProcessToken();
+                    Out += ": ";
+                    ProcessToken();
+                    if (i != Num - 1)
+                        Out += ", ";
+                }
+#if FormatMaps
+                Out += '\n';
                 DropIndent();
+                Indent();
+#else
+                Out += ' ';
+#endif
+                Out += "})";
+                ProcessToken();
+                break;
+            }
+            case EX_EndMapConst:
+            {
                 break;
             }
             default:

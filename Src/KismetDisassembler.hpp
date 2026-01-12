@@ -441,6 +441,11 @@ ContextLogic:
                 OutLine("EX_LetBool");
                 goto LetLogic;
             }
+            case EX_LetDelegate:
+            {
+                OutLine("EX_LetDelegate");
+                goto LetLogic;
+            }
             case EX_Let:
             {
                 {
@@ -852,6 +857,22 @@ LetLogic:
                 OutLine("EX_EndMap");
                 break;
             }
+            case EX_MapConst:
+            {
+                auto Key = ReadPtr<UnrealProperty>();
+                auto Val = ReadPtr<UnrealProperty>();
+                auto Num = ReadInt32();
+                OutLine("EX_MapConst ({}) ({}) ({})", Key->GetFullName(), Val->GetFullName(), Num);
+                AddIndent();
+                while (ProcessToken() != EX_EndMapConst) { OutLine(""); }
+                DropIndent();
+                break;
+            }
+            case EX_EndMapConst:
+            {
+                OutLine("EX_EndMapConst");
+                break;
+            }
             case EX_SoftObjectConst:
             {
                 OutLine("EX_SoftObjectConst");
@@ -860,11 +881,20 @@ LetLogic:
                 DropIndent();
                 break;
             }
+            case EX_FieldPathConst:
+            {
+                OutLine("EX_FieldPathConst");
+                AddIndent();
+                ProcessToken();
+                DropIndent();
+                break;
+            }
             default:
             {
-#ifdef SEARCH_FOR_UNKNOWNS
+#if SEARCH_FOR_UNKNOWNS
                 MessageBox("UNKNOWN AT {}", CurrentFunc->GetFullName());
 #endif
+                MessageBox("Unknown: 0x{:02X}", (uint8)Token);
                 OutLine("Unknown: 0x{:02X}", (uint8)Token);
                 ScriptIndex = Script.Num(); // Skip it all to try avoid crashes (will prob still crash)
                 break;

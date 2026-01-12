@@ -42,6 +42,7 @@ namespace UnrealCore
         static bool ChunkedObjectArray = false;
         static bool FFields = false;
         static bool Doubles = false;
+        static std::wstring BRMap = L"Athena_Terrain";
     }
 
     static inline float EngineVersion = -1.0f;
@@ -819,11 +820,16 @@ namespace UnrealCore
             FString Ver;
             SystemLib->ProcessEvent(Func, &Ver);
             auto VerStr = Ver.ToString();
-            UnrealMessageBox("{}", VerStr);
+            // UnrealMessageBox("{}", VerStr);
             Ver.Free();
             EngineVersion = std::stof(VerStr);
             GameVersion = std::stof(VerStr.substr(VerStr.find_last_of('-') + 1));
         }
+
+        if (GameVersion >= 19.0f)
+            UnrealOptions::BRMap = L"Artemis_Terrain";
+        else if (GameVersion >= 11.0f)
+            UnrealOptions::BRMap = L"Apollo_Terrain";
 
         UnrealOptions::ChunkedObjectArray = EngineVersion >= 4.22f; // TODO Check 4.21
         UnrealOptions::FFields = EngineVersion >= 4.25f;
