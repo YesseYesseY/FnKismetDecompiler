@@ -10,8 +10,11 @@ using namespace UnrealCore;
 
 #define MessageBox(...) MessageBoxA(NULL, std::format(__VA_ARGS__).c_str(), "KismetDecompiler", MB_OK)
 
+#define BR_MAP L"Apollo_Terrain"
+
 #define SEARCH_FOR_UNKNOWNS 0
 #define LOAD_BR_MAP 1
+#define DECOMP_ALL_BLUEPRINTS 1
 
 #include "KismetDisassembler.hpp"
 #include "KismetDecompiler.hpp"
@@ -26,9 +29,6 @@ DWORD MainThread(HMODULE Module)
 
     InitUnrealCore();
 
-    // Just took a random ExecuteUbergraph
-    // auto Func = UObject::FindFunction(L"/Game/Athena/SupplyDrops/BP_DamageBalloon_Athena.BP_DamageBalloon_Athena_C:ExecuteUbergraph_BP_DamageBalloon_Athena");
-    // auto Class = UObject::FindClass(L"/Game/Athena/PlayerPawn_Athena.PlayerPawn_Athena_C");
     auto BlueprintGeneratedClassClass = UObject::FindClass(L"/Script/Engine.BlueprintGeneratedClass");
 
     // MessageBox("{}", EngineVersion);
@@ -39,7 +39,7 @@ DWORD MainThread(HMODULE Module)
         UObject* WorldContext;
         FString Cmd;
         UObject* Player;
-    } args { UObject::FindObject(L"/Game/Maps/Frontend.Frontend"), L"open Athena_Terrain" };
+    } args { UObject::FindObject(L"/Game/Maps/Frontend.Frontend"), L"open " BR_MAP };
     SystemLib->ProcessEvent("ExecuteConsoleCommand", &args);
 
     MessageBox("Click OK when fully loaded into the map");
@@ -63,7 +63,7 @@ DWORD MainThread(HMODULE Module)
     }
     MessageBox("No unknowns!");
 #else
-#if 1 // Disassemble all BlueprintGeneratedClasses
+#if DECOMP_ALL_BLUEPRINTS // Disassemble all BlueprintGeneratedClasses
     for (int i = 0; i < UObject::Objects->Num(); i++)
     {
         auto Object = UObject::Objects->GetObject(i);
@@ -81,7 +81,7 @@ DWORD MainThread(HMODULE Module)
     // auto Class = UObject::FindClass(L"/Game/Athena/PlayerPawn_Athena.PlayerPawn_Athena_C");
     // auto Class = UObject::FindClass(L"/Game/Athena/SupplyDrops/BP_DamageBalloon_Athena.BP_DamageBalloon_Athena_C");
     // auto Class = UObject::FindClass(L"/Game/Athena/DrivableVehicles/Mech/TestMechVehicle.TestMechVehicle_C");
-    auto Class = UObject::FindClass(L"/Game/Athena/Prototype/Blueprints/Dopey/BP_DirtShellProp.BP_DirtShellProp_C");
+    auto Class = UObject::FindClass(L"/Game/Athena/Prototype/Blueprints/Cube/CUBE.CUBE_C");
 
 #if 0 // Disassemble or Decompile
     std::ofstream outfile("script.txt");

@@ -652,6 +652,39 @@ public:
         return Token;
     }
 
+    void ProcessMap()
+    {
+        Out += '{';
+#if FormatMaps
+        AddIndent();
+#else
+        Out += ' ';
+#endif
+        auto Num = ReadInt32();
+        for (int i = 0; i < Num; i++)
+        {
+#if FormatMaps
+            Out += '\n';
+            Indent();
+#endif
+            ProcessToken();
+            Out += ": ";
+            ProcessToken();
+            if (i != Num - 1)
+                Out += ", ";
+        }
+#if FormatMaps
+        Out += '\n';
+        DropIndent();
+        Indent();
+#else
+        Out += ' ';
+#endif
+        Out += '}';
+
+        ProcessToken();
+    }
+
     EExprToken ProcessToken(bool CalledFromContext = false)
     {
         EExprToken Token = (EExprToken)Script[ScriptIndex++];
@@ -671,6 +704,7 @@ public:
 
                 break;
             }
+            case EX_DefaultVariable:
             case EX_LocalOutVariable:
             case EX_InstanceVariable:
             case EX_LocalVariable:
@@ -862,7 +896,6 @@ LetLogic:
             case EX_JumpIfNot:
             {
                 auto Skip = ReadInt32();
-                // OutLine("EX_JumpIfNot ({})", Skip);
                 Out += "if (!";
                 ProcessToken();
                 Out += std::format(") goto Label_{}", Skip);
@@ -1052,6 +1085,7 @@ LetLogic:
                 Out += '1';
                 break;
             }
+            case EX_MetaCast:
             case EX_DynamicCast:
             {
                 Out += std::format("Cast<{}>(", ReadPtr<UClass>()->GetCPPName());
@@ -1156,11 +1190,6 @@ LetLogic:
                 Out += ")";
                 break;
             }
-            case EX_DefaultVariable:
-            {
-                OutLine("EX_DefaultVariable ({})", ReadPtr<UnrealProperty>()->GetFullName());
-                break;
-            }
             case EX_ClearMulticastDelegate:
             {
                 ProcessToken();
@@ -1169,30 +1198,25 @@ LetLogic:
             }
             case EX_ArrayGetByRef:
             {
-                OutLine("EX_ArrayGetByRef");
-                AddIndent();
                 ProcessToken();
+                Out += '[';
                 ProcessToken();
-                DropIndent();
+                Out += ']';
                 break;
             }
-            case EX_MetaCast:
-            {
-                OutLine("EX_MetaCast ({})", ReadPtr<UClass>()->GetFullName());
-                AddIndent();
-                ProcessToken();
-                DropIndent();
-                break;
-            }
+
+            /* 
+               Wild that in all of 8.51 there is only 1 blueprint that uses EX_SetMap (atleast when loaded into Athena_Terrain) 
+               [yes@arch decomp]$ grep -r "EX_"
+               MinigameSettingsMachine_C.cpp:				EX_SetMap
+               MinigameSettingsMachine_C.cpp:				EX_SetMap
+            */
             case EX_SetMap:
             {
-                OutLine("EX_SetMap");
-                AddIndent();
                 ProcessToken();
-                OutLine("// Size: {}", ReadInt32());
-                OutLine("");
-                while (ProcessToken() != EX_EndMap) { }
-                DropIndent();
+                Out += ".Set(";
+                ProcessMap();
+                Out += ')';
                 break;
             }
             case EX_EndMap:
@@ -1217,34 +1241,9 @@ LetLogic:
             {
                 auto Key = ReadPtr<UnrealProperty>();
                 auto Val = ReadPtr<UnrealProperty>();
-                Out += std::format("TMap<{}, {}>({{", Key->GetCPPType(), Val->GetCPPType());
-#if FormatMaps
-                AddIndent();
-#else
-                Out += ' ';
-#endif
-                auto Num = ReadInt32();
-                for (int i = 0; i < Num; i++)
-                {
-#if FormatMaps
-                    Out += '\n';
-                    Indent();
-#endif
-                    ProcessToken();
-                    Out += ": ";
-                    ProcessToken();
-                    if (i != Num - 1)
-                        Out += ", ";
-                }
-#if FormatMaps
-                Out += '\n';
-                DropIndent();
-                Indent();
-#else
-                Out += ' ';
-#endif
-                Out += "})";
-                ProcessToken();
+                Out += std::format("TMap<{}, {}>(", Key->GetCPPType(), Val->GetCPPType());
+                ProcessMap();
+                Out += ')';
                 break;
             }
             case EX_EndMapConst:
