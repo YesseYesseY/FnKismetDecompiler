@@ -460,11 +460,9 @@ namespace UnrealCore
 
             if (UnrealOptions::FFields)
             {
-                // Name is at offset 0x0
                 auto Class = *(void**)(int64(this) + Offsets::FField_Class);
                 auto name = *(FName*)(int64(Class));
-                auto id = *(uint64*)(int64(this) + 0x8);
-                return std::format("{} ({}) ", name.ToString(), id);
+                return name.ToString();
             }
 
             auto Class = *(UObject**)(int64(this) + Offsets::UObject_Class);
@@ -644,6 +642,19 @@ namespace UnrealCore
             return -1;
         }
 
+        UnrealProperty* GetChildProp(const std::string& Name)
+        {
+            for (auto Prop : GetProps())
+            {
+                if (Prop->GetName() == Name)
+                {
+                    return Prop;
+                }
+            }
+
+            return nullptr;
+        }
+
         UFunction* GetChildFunction(const std::string& Name);
     };
 
@@ -804,21 +815,23 @@ namespace UnrealCore
 
     std::string UnrealProperty::GetCPPType()
     {
-        if (HasCastFlag(CASTCLASS_FFloatProperty)) return "float";
-        else if (HasCastFlag(CASTCLASS_FDoubleProperty)) return "double";
-        else if (HasCastFlag(CASTCLASS_FInt8Property)) return "int8";
-        else if (HasCastFlag(CASTCLASS_FInt16Property)) return "int16";
-        else if (HasCastFlag(CASTCLASS_FIntProperty)) return "int32";
-        else if (HasCastFlag(CASTCLASS_FInt64Property)) return "int64";
-        else if (HasCastFlag(CASTCLASS_FUInt16Property)) return "uint16";
-        else if (HasCastFlag(CASTCLASS_FUInt32Property)) return "uint32";
-        else if (HasCastFlag(CASTCLASS_FUInt64Property)) return "uint64";
-        else if (HasCastFlag(CASTCLASS_FNameProperty)) return "FName";
-        else if (HasCastFlag(CASTCLASS_FTextProperty)) return "FText";
-        else if (HasCastFlag(CASTCLASS_FStrProperty)) return "FString";
+        auto ret = std::format("void /*{}*/", GetClassName());
+
+        if (HasCastFlag(CASTCLASS_FFloatProperty)) ret = "float";
+        else if (HasCastFlag(CASTCLASS_FDoubleProperty)) ret = "double";
+        else if (HasCastFlag(CASTCLASS_FInt8Property)) ret = "int8";
+        else if (HasCastFlag(CASTCLASS_FInt16Property)) ret = "int16";
+        else if (HasCastFlag(CASTCLASS_FIntProperty)) ret = "int32";
+        else if (HasCastFlag(CASTCLASS_FInt64Property)) ret = "int64";
+        else if (HasCastFlag(CASTCLASS_FUInt16Property)) ret = "uint16";
+        else if (HasCastFlag(CASTCLASS_FUInt32Property)) ret = "uint32";
+        else if (HasCastFlag(CASTCLASS_FUInt64Property)) ret = "uint64";
+        else if (HasCastFlag(CASTCLASS_FNameProperty)) ret = "FName";
+        else if (HasCastFlag(CASTCLASS_FTextProperty)) ret = "FText";
+        else if (HasCastFlag(CASTCLASS_FStrProperty)) ret = "FString";
         else if (HasCastFlag(CASTCLASS_FStructProperty))
         {
-            return GetChild<UStruct*>(UnrealOptions::PropSize)->GetCPPName();
+            ret = GetChild<UStruct*>(UnrealOptions::PropSize)->GetCPPName();
         }
         else if (HasCastFlag(CASTCLASS_FBoolProperty))
         {
@@ -826,30 +839,43 @@ namespace UnrealCore
             bool IsNativeBool = FieldMask == 0xFF;
             if (IsNativeBool)
             {
-                return "bool";
+                ret = "bool";
             }
-
-            // TODO
-            return "bool /*TODO*/";
+            else
+            {
+                // TODO
+                ret = "bool /*TODO*/";
+            }
         }
         else if (HasCastFlag(CASTCLASS_FArrayProperty))
         {
-            return std::format("TArray<{}>", GetChild<UnrealProperty*>(UnrealOptions::PropSize)->GetCPPType());
+            ret = std::format("TArray<{}>", GetChild<UnrealProperty*>(UnrealOptions::PropSize)->GetCPPType());
+        }
+        else if (HasCastFlag(CASTCLASS_FSetProperty))
+        {
+            ret = std::format("TSet<{}>", GetChild<UnrealProperty*>(UnrealOptions::PropSize)->GetCPPType());
+        }
+        else if (HasCastFlag(CASTCLASS_FMapProperty))
+        {
+            auto Key = GetChild<UnrealProperty*>(UnrealOptions::PropSize);
+            auto Val = GetChild<UnrealProperty*>(UnrealOptions::PropSize + 8);
+            ret = std::format("TMap<{}, {}>", Key->GetCPPType(), Val->GetCPPType());
         }
         else if (HasCastFlag(CASTCLASS_FObjectPropertyBase))
         {
-            return std::format("{}*", GetChild<UClass*>(UnrealOptions::PropSize)->GetCPPName());
+            ret = std::format("{}*", GetChild<UClass*>(UnrealOptions::PropSize)->GetCPPName());
         }
         else if (HasCastFlag(CASTCLASS_FByteProperty))
         {
             if (auto Enum = GetChild<UEnum*>(UnrealOptions::PropSize))
             {
                 // TODO
-                return Enum->GetName();
+                ret = Enum->GetName();
             }
-            return "uint8";
+            ret = "uint8";
         }
-        return "void /*TODO*/";
+
+        return ret;
     }
 
 

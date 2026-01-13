@@ -15,6 +15,12 @@
 // CallFunc_Add_FloatFloat_ReturnValue_1 = localaccumulator.SecondaryDamage_32_EB6925F04B8C5CA1EA314ABBC9C1B68F + CallFunc_SelectFloat_ReturnValue;
 #define ParseStaticFuncs 1
 
+// Prints integer types
+// Example: 
+// Enabled: int32(12), uint8(2)
+// Disabled: 12, 2
+#define ClearIntegers 1
+
 class KismetDecompiler
 {
 private:
@@ -645,6 +651,8 @@ public:
             {
                 auto Prop = ReadPtr<UnrealProperty>();
 
+                if (Prop->HasPropertyFlag(CPF_OutParm))
+                    Out += '*';
                 Out += Prop->GetNameSafe();
 
                 break;
@@ -876,12 +884,20 @@ LetLogic:
             }
             case EX_ByteConst:
             {
-                Out += std::format("(uint8){}", ReadUInt8());
+#if ClearIntegers
+                Out += std::format("uint8({})", ReadUInt8());
+#else
+                Out += std::format("{}", ReadUInt8());
+#endif
                 break;
             }
             case EX_IntConst:
             {
-                Out += std::format("(int32){}", ReadInt32());
+#if ClearIntegers
+                Out += std::format("int32({})", ReadInt32());
+#else
+                Out += std::format("{}", ReadInt32());
+#endif
                 break;
             }
             case EX_LetValueOnPersistentFrame:
@@ -975,7 +991,11 @@ LetLogic:
             }
             case EX_SkipOffsetConst:
             {
+#if ClearIntegers
+                Out += std::format("int32({})", ReadInt32());
+#else
                 Out += std::format("{}", ReadInt32());
+#endif
                 break;
             }
             case EX_DynamicCast:
@@ -1212,7 +1232,7 @@ LetLogic:
         }
         for (int i = 0; i < Parms.size(); i++)
         {
-            Out += std::format("{} {}", Parms[i]->GetCPPType(), Parms[i]->GetNameSafe());
+            Out += std::format("{}{} {}", Parms[i]->GetCPPType(), Parms[i]->HasPropertyFlag(CPF_OutParm) ? "*" : "", Parms[i]->GetNameSafe());
             if (i != Parms.size() - 1)
                 Out += ", ";
         }
