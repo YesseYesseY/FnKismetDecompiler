@@ -51,6 +51,11 @@ public:
         return ReadBasic<int32>();
     }
 
+    int64 ReadInt64()
+    {
+        return ReadBasic<int64>();
+    }
+
     uint8 ReadUInt8()
     {
         return ReadBasic<uint8>();
@@ -200,7 +205,13 @@ public:
             case EX_LocalFinalFunction:
             case EX_FinalFunction:
             {
-                ReadPtr<UStruct>();
+                auto Func = ReadPtr<UFunction>();
+                if (Func->GetName().starts_with("ExecuteUbergraph"))
+                {
+                    ScriptIndex++;
+                    Labels[Func].push_back(ReadInt32());
+                    ScriptIndex -= 5;
+                }
                 while (PreProcessToken() != EX_EndFunctionParms) { }
                 break;
             }
@@ -214,6 +225,14 @@ public:
                 break;
             }
             case EX_False:
+            {
+                break;
+            }
+            case EX_IntZero:
+            {
+                break;
+            }
+            case EX_IntOne:
             {
                 break;
             }
@@ -233,12 +252,9 @@ public:
                 auto Name = ReadName();
                 if (Name.starts_with("ExecuteUbergraph"))
                 {
-                    for (auto Child = CurrentClass->GetChildren(); Child; Child = Child->GetNext())
+                    for (auto Func : CurrentClass->GetFuncs())
                     {
-                        static auto FunctionClass = UObject::FindClass(L"/Script/CoreUObject.Function");
-                        if (!Child->IsA(FunctionClass)) continue;
-                        auto Func = (UFunction*)Child;
-                        if (Func->GetNameSafe().starts_with("ExecuteUbergraph"))
+                        if (Func->GetName().starts_with("ExecuteUbergraph"))
                         {
                             ScriptIndex++;
                             Labels[Func].push_back(ReadInt32());
@@ -396,6 +412,16 @@ public:
             case EX_IntConst:
             {
                 ReadInt32();
+                break;
+            }
+            case EX_Int64Const:
+            {
+                ReadInt64();
+                break;
+            }
+            case EX_UInt64Const:
+            {
+                ReadUInt64();
                 break;
             }
             case EX_LocalOutVariable:
@@ -900,6 +926,24 @@ LetLogic:
 #endif
                 break;
             }
+            case EX_Int64Const:
+            {
+#if ClearIntegers
+                Out += std::format("int64({})", ReadInt64());
+#else
+                Out += std::format("{}", ReadInt64());
+#endif
+                break;
+            }
+            case EX_UInt64Const:
+            {
+#if ClearIntegers
+                Out += std::format("uint64({})", ReadUInt64());
+#else
+                Out += std::format("{}", ReadUInt64());
+#endif
+                break;
+            }
             case EX_LetValueOnPersistentFrame:
             {
                 Out += std::format("{} = ", ReadPtr<UnrealProperty>()->GetNameSafe());
@@ -996,6 +1040,16 @@ LetLogic:
 #else
                 Out += std::format("{}", ReadInt32());
 #endif
+                break;
+            }
+            case EX_IntZero:
+            {
+                Out += '0';
+                break;
+            }
+            case EX_IntOne:
+            {
+                Out += '1';
                 break;
             }
             case EX_DynamicCast:

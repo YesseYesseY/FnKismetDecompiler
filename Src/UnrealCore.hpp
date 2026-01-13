@@ -485,6 +485,9 @@ namespace UnrealCore
 
         EClassCastFlags GetCastFlags()
         {
+            if (!this)
+                return CASTCLASS_None;
+
             if (UnrealOptions::FFields)
             {
                 auto Class = *(void**)(int64(this) + Offsets::FField_Class);
@@ -497,11 +500,17 @@ namespace UnrealCore
 
         bool HasCastFlag(EClassCastFlags Flag)
         {
+            if (!this)
+                return false;
+
             return (GetCastFlags() & Flag) != CASTCLASS_None;
         }
 
         UnrealProperty* GetNext()
         {
+            if (!this)
+                return nullptr;
+
             if (UnrealOptions::FFields)
                 return *(UnrealProperty**)(int64(this) + Offsets::FField_Next);
 
@@ -510,6 +519,9 @@ namespace UnrealCore
 
         int32 GetOffset()
         {
+            if (!this)
+                return -1;
+
             if (UnrealOptions::FFields)
                 return *(int32*)(int64(this) + Offsets::FProperty_Offset);
 
@@ -518,6 +530,9 @@ namespace UnrealCore
 
         EPropertyFlags GetPropertyFlags()
         {
+            if (!this)
+                return CPF_None;
+
             if (UnrealOptions::FFields)
                 return *(EPropertyFlags*)(int64(this) + Offsets::FProperty_PropertyFlags);
 
@@ -526,6 +541,9 @@ namespace UnrealCore
 
         bool HasPropertyFlag(EPropertyFlags Flag)
         {
+            if (!this)
+                return false;
+
             return (GetPropertyFlags() & Flag) != CPF_None;
         }
 

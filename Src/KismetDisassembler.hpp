@@ -177,6 +177,11 @@ public:
         return ReadBasic<int32>();
     }
 
+    int64 ReadInt64()
+    {
+        return ReadBasic<int64>();
+    }
+
     uint8 ReadUInt8()
     {
         return ReadBasic<uint8>();
@@ -562,6 +567,16 @@ LetLogic:
                 OutLine("EX_IntConst ({})", ReadInt32());
                 break;
             }
+            case EX_Int64Const:
+            {
+                OutLine("EX_Int64Const ({})", ReadInt64());
+                break;
+            }
+            case EX_UInt64Const:
+            {
+                OutLine("EX_UInt64Const ({})", ReadUInt64());
+                break;
+            }
             case EX_LocalOutVariable:
             {
                 OutLine("EX_LocalOutVariable ({})", ReadPtr<UnrealProperty>()->GetFullName());
@@ -887,6 +902,16 @@ LetLogic:
                 AddIndent();
                 ProcessToken();
                 DropIndent();
+                break;
+            }
+            case EX_IntZero:
+            {
+                OutLine("EX_IntZero");
+                break;
+            }
+            case EX_IntOne:
+            {
+                OutLine("EX_IntOne");
                 break;
             }
             default:
