@@ -11,6 +11,7 @@ using namespace UnrealCore;
 #define MessageBox(...) MessageBoxA(NULL, std::format(__VA_ARGS__).c_str(), "KismetDecompiler", MB_OK)
 
 #define SEARCH_FOR_UNKNOWNS 0
+
 #include "KismetDisassembler.hpp"
 #include "KismetDecompiler.hpp"
 #include "Utils.hpp"
@@ -35,7 +36,7 @@ DWORD MainThread(HMODULE Module)
 #endif
 
 #if SEARCH_FOR_UNKNOWNS
-#if 0
+#if 1
     auto SystemLib = UObject::FindObject(L"/Script/Engine.Default__KismetSystemLibrary");
     struct {
         UObject* WorldContext;
@@ -72,10 +73,10 @@ DWORD MainThread(HMODULE Module)
     }
 #else
     // auto Class = UObject::FindClass(L"/Game/Athena/Athena_PlayerController.Athena_PlayerController_C");
-    // auto Class = UObject::FindClass(L"/Game/Athena/PlayerPawn_Athena.PlayerPawn_Athena_C");
+    auto Class = UObject::FindClass(L"/Game/Athena/PlayerPawn_Athena.PlayerPawn_Athena_C");
     // auto Class = UObject::FindClass(L"/Game/Athena/SupplyDrops/BP_DamageBalloon_Athena.BP_DamageBalloon_Athena_C");
     // auto Class = UObject::FindClass(L"/Game/Athena/DrivableVehicles/Mech/TestMechVehicle.TestMechVehicle_C");
-    auto Class = UObject::FindClass(L"/CRD_Melee/Weapons/B_MeleeManager_Variant_Template_Parent.B_MeleeManager_Variant_Template_Parent_C");
+    // auto Class = UObject::FindClass(L"/CRD_Melee/Weapons/B_MeleeManager_Variant_Template_Parent.B_MeleeManager_Variant_Template_Parent_C");
 
 #if 0 // Disassemble or Decompile
     std::ofstream outfile("script.txt");

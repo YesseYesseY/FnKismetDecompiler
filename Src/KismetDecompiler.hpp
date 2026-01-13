@@ -232,7 +232,7 @@ public:
                         static auto FunctionClass = UObject::FindClass(L"/Script/CoreUObject.Function");
                         if (!Child->IsA(FunctionClass)) continue;
                         auto Func = (UFunction*)Child;
-                        if (Func->GetName().starts_with("ExecuteUbergraph"))
+                        if (Func->GetNameSafe().starts_with("ExecuteUbergraph"))
                         {
                             ScriptIndex++;
                             Labels[Func].push_back(ReadInt32());
@@ -645,7 +645,7 @@ public:
             {
                 auto Prop = ReadPtr<UnrealProperty>();
 
-                Out += Prop->GetName();
+                Out += Prop->GetNameSafe();
 
                 break;
             }
@@ -664,7 +664,7 @@ public:
 #define BasicStaticMathOp(Operation) { StaticParsed = true; ProcessToken(); Out += " " Operation " "; ProcessToken(); }
 
                 static auto MathLibClass = UObject::FindClass(L"/Script/Engine.KismetMathLibrary");
-                auto FuncName = Func->GetName();
+                auto FuncName = Func->GetNameSafe();
                 if (Func->GetOuter() == MathLibClass)
                 {
                     if (FuncName.starts_with("Add_")) BasicStaticMathOp("+")
@@ -675,6 +675,7 @@ public:
                     else if (FuncName.starts_with("GreaterEqual_")) BasicStaticMathOp(">=")
                     else if (FuncName.starts_with("EqualEqual_")) BasicStaticMathOp("==")
                     else if (FuncName.starts_with("NotEqual_")) BasicStaticMathOp("!=")
+                    else if (FuncName.starts_with("Subtract_")) BasicStaticMathOp("-")
                     else if (FuncName == "BooleanAND") BasicStaticMathOp("&&")
                     else if (FuncName == "BooleanOR") BasicStaticMathOp("||")
                     else if (FuncName == "Not_PreBool")
@@ -704,7 +705,7 @@ public:
                 {
                     if (!CalledFromContext && Func->HasFunctionFlag(EFunctionFlags::FUNC_Static))
                         Out += std::format("{}::", Func->GetOuter()->GetCPPName());
-                    Out += std::format("{}(", Func->GetName());
+                    Out += std::format("{}(", Func->GetNameSafe());
                     ArgsLoop();
                     Out += ")";
                 }
@@ -717,7 +718,6 @@ public:
             }
             case EX_EndFunctionParms:
             {
-                // OutLine("EX_EndFunctionParms");
                 break;
             }
             case EX_False:
@@ -886,7 +886,7 @@ LetLogic:
             }
             case EX_LetValueOnPersistentFrame:
             {
-                Out += std::format("{} = ", ReadPtr<UnrealProperty>()->GetName());
+                Out += std::format("{} = ", ReadPtr<UnrealProperty>()->GetNameSafe());
                 ProcessToken();
 
                 break;
@@ -912,6 +912,7 @@ LetLogic:
                 Out += "; }";
                 break;
             }
+            case EX_NoInterface:
             case EX_NoObject:
             {
                 Out += "nullptr";
@@ -921,20 +922,12 @@ LetLogic:
             {
                 auto Prop = ReadPtr<UnrealProperty>();
                 ProcessToken();
-                Out += std::format(".{}", Prop->GetName());
-                // OutLine("EX_StructMemberContext");
-
-                // AddIndent();
-                // OutLine("// Var ({})", ReadPtr<UnrealProperty>()->GetFullName());
-                // OutLine("");
-                // OutLine("// Expr");
-                // ProcessToken();
-                // DropIndent();
+                Out += std::format(".{}", Prop->GetNameSafe());
                 break;
             }
             case EX_ObjToInterfaceCast:
             {
-                Out += std::format("GetInterface<I{}>(", ReadPtr<UClass>()->GetName());
+                Out += std::format("GetInterface<I{}>(", ReadPtr<UClass>()->GetNameSafe());
                 ProcessToken();
                 Out += ')';
                 break;
@@ -958,15 +951,10 @@ LetLogic:
                     }
                 }
                 Out += "])";
-                // OutLine("EX_ArrayConst (Size: {}) ({})", ReadInt32(), Prop->GetFullName());
-                // AddIndent();
-                // while (ProcessToken() != EX_EndArrayConst) { }
-                // DropIndent();
                 break;
             }
             case EX_EndArrayConst:
             {
-                // OutLine("EX_EndArrayConst");
                 break;
             }
             case EX_TransformConst:
@@ -1006,11 +994,7 @@ LetLogic:
             }
             case EX_InterfaceContext:
             {
-                // OutLine("EX_InterfaceContext");
-                // 
-                // AddIndent();
                 ProcessToken();
-                // DropIndent();
                 break;
             }
             case EX_SetArray:
@@ -1033,7 +1017,7 @@ LetLogic:
             }
             case EX_UnicodeStringConst:
             {
-                OutLine("EX_UnicodeStringConst (L\"{}\")", ReadString16());
+                Out += std::format("L\"{}\"", ReadString16());
                 break;
             }
             case EX_TextConst:
@@ -1080,15 +1064,6 @@ LetLogic:
                 Out += std::format(".Bind(\"{}\", ", Event);
                 ProcessToken();
                 Out += ')';
-                // OutLine("EX_BindDelegate ({})", ReadName());
-
-                // AddIndent();
-                // OutLine("// Delegate");
-                // ProcessToken();
-                // OutLine("");
-                // OutLine("// Object");
-                // ProcessToken();
-                // DropIndent();
                 break;
             }
             case EX_AddMulticastDelegate:
@@ -1133,11 +1108,6 @@ LetLogic:
                 AddIndent();
                 ProcessToken();
                 DropIndent();
-                break;
-            }
-            case EX_NoInterface:
-            {
-                OutLine("EX_NoInterface");
                 break;
             }
             case EX_SetMap:
@@ -1231,7 +1201,7 @@ LetLogic:
             rettype = retprop->GetCPPType();
 
         Indent();
-        Out += std::format("{} {}(", rettype, Function->GetName());
+        Out += std::format("{} {}(", rettype, Function->GetNameSafe());
         std::vector<UnrealProperty*> Parms;
         for (auto Prop : Function->GetProps())
         {
@@ -1242,7 +1212,7 @@ LetLogic:
         }
         for (int i = 0; i < Parms.size(); i++)
         {
-            Out += std::format("{} {}", Parms[i]->GetCPPType(), Parms[i]->GetName());
+            Out += std::format("{} {}", Parms[i]->GetCPPType(), Parms[i]->GetNameSafe());
             if (i != Parms.size() - 1)
                 Out += ", ";
         }
@@ -1258,13 +1228,12 @@ LetLogic:
             }
             if (Script[ScriptIndex] != EX_EndOfScript)
                 Indent();
+
             auto Token = ProcessToken();
-            // TODO? Look at static functions such as UKismetMathLibrary::Greater_FloatFloat(RandomArg, 2.5f) and turn it into RandomArg > 2.5f
             if (Token != EX_Nothing && Token != EX_EndOfScript)
                  Out += ';';
             if (Token != EX_EndOfScript)
                 Out += '\n';
-            // OutLine("");
         }
         DropIndent();
         OutLine("}}");
@@ -1275,13 +1244,11 @@ LetLogic:
     {
         CurrentClass = Class;
         static auto FunctionClass = UObject::FindClass(L"/Script/CoreUObject.Function");
-        for (auto Child = Class->GetChildren(); Child; Child = Child->GetNext())
+        for (auto Func : Class->GetFuncs(false))
         {
-            if (!Child->IsA(FunctionClass)) continue;
-
-            Script = ((UFunction*)Child)->GetScript();
+            Script = Func->GetScript();
             ScriptIndex = 0;
-            CurrentFunc = ((UFunction*)Child);
+            CurrentFunc = Func;
             while (ScriptIndex < Script.Num())
             {
                 PreProcessToken();
@@ -1290,11 +1257,13 @@ LetLogic:
 
         Out += std::format("class {} : public {}\n{{\n", Class->GetCPPName(), Class->GetSuperStruct()->GetCPPName());
         AddIndent();
-        for (auto Child = Class->GetChildren(); Child; Child = Child->GetNext())
+        for (auto Prop : Class->GetProps(false))
         {
-            if (!Child->IsA(FunctionClass)) continue;
-
-            auto Func = (UFunction*)Child;
+            OutLine("{} {};", Prop->GetCPPType(), Prop->GetNameSafe());
+        }
+        OutLine("");
+        for (auto Func : Class->GetFuncs(false))
+        {
             Disassemble(Func);
             OutLine("");
         }

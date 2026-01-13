@@ -29,12 +29,17 @@ namespace UnrealCore
 
         static int32 FField_Next = -1;
         static int32 FField_Name = -1;
+        static int32 FField_Class = -1;
+
+        static int32 FFieldClass_CastFlags = -1;
 
         static int32 FProperty_Offset = -1;
         static int32 FProperty_PropertyFlags = -1;
 
         static int32 UFunction_ExecFunc = -1;
         static int32 UFunction_FunctionFlags = -1;
+
+        static int32 UClass_CastFlags = -1;
     }
 
     namespace UnrealOptions
@@ -43,6 +48,7 @@ namespace UnrealCore
         static bool FFields = false;
         static bool Doubles = false;
         static std::wstring BRMap = L"Athena_Terrain";
+        static int32 PropSize = -1;
     }
 
     static inline float EngineVersion = -1.0f;
@@ -327,6 +333,27 @@ namespace UnrealCore
             return "None";
         }
 
+        std::string GetNameSafe()
+        {
+            auto ret = GetName();
+
+            if (ret[0] >= '0' && ret[0] <= '9')
+                ret[0] = '_';
+
+            for (int i = 0; i < ret.size(); i++)
+            {
+                auto c = ret[i];
+                if (c == '_' ||
+                    (c >= 'a' && c <= 'z') ||
+                    (c >= 'A' && c <= 'Z') ||
+                    (c >= '0' && c <= '9')) continue;
+
+                ret[i] = '_';
+            }
+
+            return ret;
+        }
+
         std::wstring GetWName()
         {
             return GetNamePrivate().ToWString();
@@ -375,8 +402,6 @@ namespace UnrealCore
         {
             return (GetPropertyFlags() & Flag) != CPF_None;
         }
-
-        std::string GetCPPType();
     };
 
     class UEnum : public UField
@@ -386,6 +411,12 @@ namespace UnrealCore
     class UnrealProperty
     {
     public:
+        template <typename T>
+        T& GetChild(int32 Offset)
+        {
+            return *(T*)(int64(this) + Offset);
+        }
+
         std::string GetName()
         {
             if (!this)
@@ -401,6 +432,45 @@ namespace UnrealCore
             return name.ToString();
         }
 
+        std::string GetNameSafe()
+        {
+            auto ret = GetName();
+
+            if (ret[0] >= '0' && ret[0] <= '9')
+                ret[0] = '_';
+
+            for (int i = 0; i < ret.size(); i++)
+            {
+                auto c = ret[i];
+                if (c == '_' ||
+                    (c >= 'a' && c <= 'z') ||
+                    (c >= 'A' && c <= 'Z') ||
+                    (c >= '0' && c <= '9')) continue;
+
+                ret[i] = '_';
+            }
+
+            return ret;
+        }
+
+        std::string GetClassName()
+        {
+            if (!this)
+                return "None";
+
+            if (UnrealOptions::FFields)
+            {
+                // Name is at offset 0x0
+                auto Class = *(void**)(int64(this) + Offsets::FField_Class);
+                auto name = *(FName*)(int64(Class));
+                auto id = *(uint64*)(int64(this) + 0x8);
+                return std::format("{} ({}) ", name.ToString(), id);
+            }
+
+            auto Class = *(UObject**)(int64(this) + Offsets::UObject_Class);
+            return Class->GetName();
+        }
+
         std::string GetFullName()
         {
             if (!this)
@@ -409,10 +479,27 @@ namespace UnrealCore
             if (UnrealOptions::FFields)
             {
                 // TODO
-                return GetName();
+                return std::format("{} {}", GetClassName(), GetName());
             }
 
             return ((UObject*)this)->GetFullName();
+        }
+
+        EClassCastFlags GetCastFlags()
+        {
+            if (UnrealOptions::FFields)
+            {
+                auto Class = *(void**)(int64(this) + Offsets::FField_Class);
+                return *(EClassCastFlags*)(int64(Class) + Offsets::FFieldClass_CastFlags);
+            }
+
+            auto Class = *(void**)(int64(this) + Offsets::UObject_Class);
+            return *(EClassCastFlags*)(int64(Class) + Offsets::UClass_CastFlags);
+        }
+
+        bool HasCastFlag(EClassCastFlags Flag)
+        {
+            return (GetCastFlags() & Flag) != CASTCLASS_None;
         }
 
         UnrealProperty* GetNext()
@@ -444,13 +531,7 @@ namespace UnrealCore
             return (GetPropertyFlags() & Flag) != CPF_None;
         }
 
-        std::string GetCPPType()
-        {
-            if (UnrealOptions::FFields)
-                return "void /*TODO*/";
-
-            return ((UProperty*)this)->GetCPPType();
-        }
+        std::string GetCPPType();
     };
 
     class UStruct : public UField
@@ -495,7 +576,7 @@ namespace UnrealCore
             return false;
         }
 
-        std::vector<UFunction*> GetFuncs()
+        std::vector<UFunction*> GetFuncs(bool Recursive = true)
         {
             static auto FunctionClass = UObject::FindClass(L"/Script/CoreUObject.Function");
 
@@ -509,11 +590,14 @@ namespace UnrealCore
                         ret.push_back((UFunction*)Child);
                     }
                 }
+
+                if (!Recursive)
+                    break;
             }
             return ret;
         }
 
-        std::vector<UnrealProperty*> GetProps()
+        std::vector<UnrealProperty*> GetProps(bool Recursive = true)
         {
             std::vector<UnrealProperty*> ret;
 
@@ -525,6 +609,9 @@ namespace UnrealCore
                     {
                         ret.push_back((UnrealProperty*)Child);
                     }
+
+                    if (!Recursive)
+                        break;
                 }
             }
             else
@@ -537,6 +624,9 @@ namespace UnrealCore
                         if (Child->IsA(PropertyClass))
                             ret.push_back((UnrealProperty*)Child);
                     }
+
+                    if (!Recursive)
+                        break;
                 }
             }
 
@@ -559,6 +649,10 @@ namespace UnrealCore
 
     class UClass : public UStruct
     {
+        EClassCastFlags GetCastFlags()
+        {
+            GetChild<EClassCastFlags>(Offsets::UClass_CastFlags);
+        }
     };
 
     class UFunction : public UStruct
@@ -697,89 +791,6 @@ namespace UnrealCore
         return GetClass()->GetChildFunction(Name);
     }
 
-    std::string UProperty::GetCPPType()
-    {
-        /*TODO*/ static auto EnumPropertyClass = UObject::FindClass(L"/Script/CoreUObject.EnumProperty");
-        static auto ArrayPropertyClass = UObject::FindClass(L"/Script/CoreUObject.ArrayProperty");
-        static auto ObjectPropertyBaseClass = UObject::FindClass(L"/Script/CoreUObject.ObjectPropertyBase");
-        static auto BoolPropertyClass = UObject::FindClass(L"/Script/CoreUObject.BoolProperty");
-        static auto BytePropertyClass = UObject::FindClass(L"/Script/CoreUObject.ByteProperty");
-        /*TODO*/ static auto ObjectPropertyClass = UObject::FindClass(L"/Script/CoreUObject.ObjectProperty");
-        /*TODO*/ static auto ClassPropertyClass = UObject::FindClass(L"/Script/CoreUObject.ClassProperty");
-        /*TODO*/ static auto DelegatePropertyClass = UObject::FindClass(L"/Script/CoreUObject.DelegateProperty");
-        static auto DoublePropertyClass = UObject::FindClass(L"/Script/CoreUObject.DoubleProperty");
-        static auto FloatPropertyClass = UObject::FindClass(L"/Script/CoreUObject.FloatProperty");
-        static auto IntPropertyClass = UObject::FindClass(L"/Script/CoreUObject.IntProperty");
-        static auto Int16PropertyClass = UObject::FindClass(L"/Script/CoreUObject.Int16Property");
-        static auto Int64PropertyClass = UObject::FindClass(L"/Script/CoreUObject.Int64Property");
-        static auto Int8PropertyClass = UObject::FindClass(L"/Script/CoreUObject.Int8Property");
-        /*TODO*/ static auto InterfacePropertyClass = UObject::FindClass(L"/Script/CoreUObject.InterfaceProperty");
-        /*TODO*/ static auto LazyObjectPropertyClass = UObject::FindClass(L"/Script/CoreUObject.LazyObjectProperty");
-        /*TODO*/ static auto MapPropertyClass = UObject::FindClass(L"/Script/CoreUObject.MapProperty");
-        /*TODO*/ static auto MulticastDelegatePropertyClass = UObject::FindClass(L"/Script/CoreUObject.MulticastDelegateProperty");
-        static auto NamePropertyClass = UObject::FindClass(L"/Script/CoreUObject.NameProperty");
-        /*TODO*/ static auto SetPropertyClass = UObject::FindClass(L"/Script/CoreUObject.SetProperty");
-        /*TODO*/ static auto SoftObjectPropertyClass = UObject::FindClass(L"/Script/CoreUObject.SoftObjectProperty");
-        /*TODO*/ static auto SoftClassPropertyClass = UObject::FindClass(L"/Script/CoreUObject.SoftClassProperty");
-        static auto StrPropertyClass = UObject::FindClass(L"/Script/CoreUObject.StrProperty");
-        static auto StructPropertyClass = UObject::FindClass(L"/Script/CoreUObject.StructProperty");
-        static auto UInt16PropertyClass = UObject::FindClass(L"/Script/CoreUObject.UInt16Property");
-        static auto UInt32PropertyClass = UObject::FindClass(L"/Script/CoreUObject.UInt32Property");
-        static auto UInt64PropertyClass = UObject::FindClass(L"/Script/CoreUObject.UInt64Property");
-        /*TODO*/ static auto WeakObjectPropertyClass = UObject::FindClass(L"/Script/CoreUObject.WeakObjectProperty");
-        static auto TextPropertyClass = UObject::FindClass(L"/Script/CoreUObject.TextProperty");
-
-        static auto BasePropertySize = UObject::FindClass(L"/Script/CoreUObject.Property")->GetSize();
-
-        auto Class = GetClass();
-        if (Class == BoolPropertyClass)
-        {
-            auto FieldMask = GetChild<uint8>(BasePropertySize + 3);
-            bool IsNativeBool = FieldMask == 0xFF;
-            if (IsNativeBool)
-            {
-                return "bool";
-            }
-
-            // TODO
-            return "bool /*TODO*/";
-        }
-        else if (IsA(BytePropertyClass))
-        {
-            if (auto Enum = GetChild<UEnum*>(BasePropertySize))
-            {
-                // TODO
-                return std::format("TEnumAsByte<>");
-            }
-            return "uint8";
-        }
-        else if (IsA(StructPropertyClass))
-        {
-            return GetChild<UStruct*>(BasePropertySize)->GetCPPName();
-        }
-        else if (IsA(ArrayPropertyClass))
-        {
-            return std::format("TArray<{}>", GetChild<UProperty*>(BasePropertySize)->GetCPPType());
-        }
-        else if (IsA(ObjectPropertyBaseClass))
-        {
-            return std::format("{}*", GetChild<UClass*>(BasePropertySize)->GetCPPName());
-        }
-        else if (IsA(FloatPropertyClass)) return "float";
-        else if (IsA(DoublePropertyClass)) return "double";
-        else if (IsA(Int8PropertyClass)) return "int8";
-        else if (IsA(Int16PropertyClass)) return "int16";
-        else if (IsA(IntPropertyClass)) return "int32";
-        else if (IsA(Int64PropertyClass)) return "int64";
-        else if (IsA(UInt16PropertyClass)) return "uint16";
-        else if (IsA(UInt32PropertyClass)) return "uint32";
-        else if (IsA(UInt64PropertyClass)) return "uint64";
-        else if (IsA(NamePropertyClass)) return "FName";
-        else if (IsA(TextPropertyClass)) return "FText";
-        else if (IsA(StrPropertyClass)) return "FString";
-        return "void /*TODO*/";
-    }
-
     UFunction* UStruct::GetChildFunction(const std::string& Name)
     {
         for (auto Func : GetFuncs())
@@ -791,6 +802,55 @@ namespace UnrealCore
         return nullptr;
     }
 
+    std::string UnrealProperty::GetCPPType()
+    {
+        if (HasCastFlag(CASTCLASS_FFloatProperty)) return "float";
+        else if (HasCastFlag(CASTCLASS_FDoubleProperty)) return "double";
+        else if (HasCastFlag(CASTCLASS_FInt8Property)) return "int8";
+        else if (HasCastFlag(CASTCLASS_FInt16Property)) return "int16";
+        else if (HasCastFlag(CASTCLASS_FIntProperty)) return "int32";
+        else if (HasCastFlag(CASTCLASS_FInt64Property)) return "int64";
+        else if (HasCastFlag(CASTCLASS_FUInt16Property)) return "uint16";
+        else if (HasCastFlag(CASTCLASS_FUInt32Property)) return "uint32";
+        else if (HasCastFlag(CASTCLASS_FUInt64Property)) return "uint64";
+        else if (HasCastFlag(CASTCLASS_FNameProperty)) return "FName";
+        else if (HasCastFlag(CASTCLASS_FTextProperty)) return "FText";
+        else if (HasCastFlag(CASTCLASS_FStrProperty)) return "FString";
+        else if (HasCastFlag(CASTCLASS_FStructProperty))
+        {
+            return GetChild<UStruct*>(UnrealOptions::PropSize)->GetCPPName();
+        }
+        else if (HasCastFlag(CASTCLASS_FBoolProperty))
+        {
+            auto FieldMask = GetChild<uint8>(UnrealOptions::PropSize + 3);
+            bool IsNativeBool = FieldMask == 0xFF;
+            if (IsNativeBool)
+            {
+                return "bool";
+            }
+
+            // TODO
+            return "bool /*TODO*/";
+        }
+        else if (HasCastFlag(CASTCLASS_FArrayProperty))
+        {
+            return std::format("TArray<{}>", GetChild<UnrealProperty*>(UnrealOptions::PropSize)->GetCPPType());
+        }
+        else if (HasCastFlag(CASTCLASS_FObjectPropertyBase))
+        {
+            return std::format("{}*", GetChild<UClass*>(UnrealOptions::PropSize)->GetCPPName());
+        }
+        else if (HasCastFlag(CASTCLASS_FByteProperty))
+        {
+            if (auto Enum = GetChild<UEnum*>(UnrealOptions::PropSize))
+            {
+                // TODO
+                return Enum->GetName();
+            }
+            return "uint8";
+        }
+        return "void /*TODO*/";
+    }
 
 
     static void InitUnrealCore()
@@ -859,16 +919,31 @@ namespace UnrealCore
         Offsets::UProperty_Offset = 0x44;
 
         auto StructClass = UObject::FindClass(L"/Script/CoreUObject.Struct");
+        auto ClassClass = UObject::FindClass(L"/Script/CoreUObject.Class");
         Offsets::UFunction_FunctionFlags = StructClass->GetSize();
         Offsets::UFunction_ExecFunc = Offsets::UFunction_FunctionFlags + 0x28;
 
+        if (EngineVersion >= 5.0f || ClassClass->GetSize() == 0x238)
+            Offsets::UClass_CastFlags = StructClass->GetSize() + 0x28;
+        else if (EngineVersion >= 4.22f) // TODO Check 4.21
+            Offsets::UClass_CastFlags = StructClass->GetSize() + 0x20;
+        else
+            Offsets::UClass_CastFlags = StructClass->GetSize() + 0x30;
+
+        UnrealOptions::PropSize = UObject::FindClass(L"/Script/CoreUObject.Property")->GetSize();
+
         if (UnrealOptions::FFields)
         {
+            Offsets::FField_Class = 0x8;
             Offsets::FField_Next = 0x20;
             Offsets::FField_Name = Offsets::FField_Next + 0x8;
 
+            Offsets::FFieldClass_CastFlags = 0x10;
+
             Offsets::FProperty_PropertyFlags = 0x40;
             Offsets::FProperty_Offset = Offsets::FProperty_PropertyFlags + 0xC;
+
+            UnrealOptions::PropSize = 0x78;
         }
     }
 }
