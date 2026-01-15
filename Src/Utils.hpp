@@ -2,7 +2,7 @@ namespace Utils
 {
     void DumpObjects()
     {
-        std::ofstream outfile("objects.txt");
+        std::ofstream outfile("unrealobjects.txt");
         for (int i = 0; i < UObject::Objects->Num(); i++)
         {
             auto Object = UObject::Objects->GetObject(i);

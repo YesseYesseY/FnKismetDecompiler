@@ -10,11 +10,12 @@ using namespace UnrealCore;
 
 #define MessageBox(...) MessageBoxA(NULL, std::format(__VA_ARGS__).c_str(), "KismetDecompiler", MB_OK)
 
-#define BR_MAP L"Apollo_Terrain"
+#define BR_MAP L"Artemis_Terrain"
 
 #define SEARCH_FOR_UNKNOWNS 0
-#define LOAD_BR_MAP 1
+#define LOAD_BR_MAP 0
 #define DECOMP_ALL_BLUEPRINTS 1
+#define DUMP_OBJECTS 0
 
 #include "KismetDisassembler.hpp"
 #include "KismetDecompiler.hpp"
@@ -45,7 +46,7 @@ DWORD MainThread(HMODULE Module)
     MessageBox("Click OK when fully loaded into the map");
 #endif
 
-#if 0
+#if DUMP_OBJECTS
     Utils::DumpObjects();
 #endif
 
@@ -81,7 +82,7 @@ DWORD MainThread(HMODULE Module)
     // auto Class = UObject::FindClass(L"/Game/Athena/PlayerPawn_Athena.PlayerPawn_Athena_C");
     // auto Class = UObject::FindClass(L"/Game/Athena/SupplyDrops/BP_DamageBalloon_Athena.BP_DamageBalloon_Athena_C");
     // auto Class = UObject::FindClass(L"/Game/Athena/DrivableVehicles/Mech/TestMechVehicle.TestMechVehicle_C");
-    auto Class = UObject::FindClass(L"/Game/Athena/Prototype/Blueprints/Cube/CUBE.CUBE_C");
+    auto Class = UObject::FindClass(L"/Game/Athena/DrivableVehicles/Athena_VehicleSpawner.Athena_VehicleSpawner_C");
 
 #if 0 // Disassemble or Decompile
     std::ofstream outfile("script.txt");

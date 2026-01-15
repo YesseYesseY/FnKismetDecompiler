@@ -737,13 +737,14 @@ public:
                 {
                     if (FuncName.starts_with("Add_")) BasicStaticMathOp("+")
                     else if (FuncName.starts_with("Multiply_")) BasicStaticMathOp("*")
+                    else if (FuncName.starts_with("Subtract_")) BasicStaticMathOp("-")
+                    else if (FuncName.starts_with("Divide_")) BasicStaticMathOp("-")
                     else if (FuncName.starts_with("Less_")) BasicStaticMathOp("<")
                     else if (FuncName.starts_with("LessEqual_")) BasicStaticMathOp("<=")
                     else if (FuncName.starts_with("Greater_")) BasicStaticMathOp(">")
                     else if (FuncName.starts_with("GreaterEqual_")) BasicStaticMathOp(">=")
                     else if (FuncName.starts_with("EqualEqual_")) BasicStaticMathOp("==")
                     else if (FuncName.starts_with("NotEqual_")) BasicStaticMathOp("!=")
-                    else if (FuncName.starts_with("Subtract_")) BasicStaticMathOp("-")
                     else if (FuncName == "BooleanAND") BasicStaticMathOp("&&")
                     else if (FuncName == "BooleanOR") BasicStaticMathOp("||")
                     else if (FuncName == "Not_PreBool")
@@ -988,21 +989,71 @@ LetLogic:
             {
                 auto Num = ReadUInt16();
                 auto Skip = ReadInt32();
-                Out += "switch (";
-                ProcessToken();
-                Out += ") { ";
-                for (uint16 i = 0; i < Num; i++)
+
+                UnrealProperty* Prop = nullptr;
+                if (
+                    Script[ScriptIndex] == EX_DefaultVariable
+                    || Script[ScriptIndex] == EX_LocalOutVariable
+                    || Script[ScriptIndex] == EX_InstanceVariable
+                    || Script[ScriptIndex] == EX_LocalVariable
+                    )
                 {
-                    Out += "case ";
-                    ProcessToken();
-                    Out += ": ";
-                    ReadInt32();
-                    ProcessToken();
-                    Out += "; ";
+                    auto Idx = ScriptIndex;
+                    ScriptIndex++;
+                    Prop = ReadPtr<UnrealProperty>();
+                    ScriptIndex = Idx;
                 }
-                Out += "default: ";
-                ProcessToken();
-                Out += "; }";
+
+                if (Num == 2 && Prop->HasCastFlag(CASTCLASS_FBoolProperty))
+                {
+                    ProcessToken();
+                    Out += " ? ";
+                    if (Script[ScriptIndex] == EX_True)
+                    {
+                        ScriptIndex++;
+                        ReadInt32();
+                        ProcessToken();
+                        Out += " : ";
+                        ScriptIndex++;
+                        ReadInt32();
+                        ProcessToken();
+                    }
+                    else
+                    {
+                        ScriptIndex++;
+                        ReadInt32();
+                        auto Idx = ScriptIndex;
+                        PreProcessToken();
+                        ScriptIndex++;
+                        ReadInt32();
+                        ProcessToken();
+                        Out += " : ";
+                        auto Idx2 = ScriptIndex;
+                        ScriptIndex = Idx;
+                        ProcessToken();
+                        ScriptIndex = Idx2;
+                    }
+
+                    PreProcessToken();
+                }
+                else
+                {
+                    Out += "switch (";
+                    ProcessToken();
+                    Out += ") { ";
+                    for (uint16 i = 0; i < Num; i++)
+                    {
+                        Out += "case ";
+                        ProcessToken();
+                        Out += ": ";
+                        ReadInt32();
+                        ProcessToken();
+                        Out += "; ";
+                    }
+                    Out += "default: ";
+                    ProcessToken();
+                    Out += "; }";
+                }
                 break;
             }
             case EX_NoInterface:

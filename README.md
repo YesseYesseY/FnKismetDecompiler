@@ -21,3 +21,7 @@ Versions below the unreal versions are fortnite builds i've tested it on
 
 # Goal
 The final goal is to decompile kismet bytecode to psuedo c++ on unreal versions 4.20 to 5.4 (maybe more in the future but rn it's the only versions i care about)
+
+# Things used
+[UnrealContainers](https://github.com/Fischsalat/UnrealContainers)
+[Memcury](https://github.com/kem0x/Memcury)
