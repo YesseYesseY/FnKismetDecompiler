@@ -738,7 +738,7 @@ public:
                     if (FuncName.starts_with("Add_")) BasicStaticMathOp("+")
                     else if (FuncName.starts_with("Multiply_")) BasicStaticMathOp("*")
                     else if (FuncName.starts_with("Subtract_")) BasicStaticMathOp("-")
-                    else if (FuncName.starts_with("Divide_")) BasicStaticMathOp("-")
+                    else if (FuncName.starts_with("Divide_")) BasicStaticMathOp("/")
                     else if (FuncName.starts_with("Less_")) BasicStaticMathOp("<")
                     else if (FuncName.starts_with("LessEqual_")) BasicStaticMathOp("<=")
                     else if (FuncName.starts_with("Greater_")) BasicStaticMathOp(">")
@@ -766,6 +766,39 @@ public:
                         Out += " : ";
                         ProcessToken();
                         PreProcessToken();
+                    }
+                    else if (FuncName == "MakeRotator")
+                    {
+                        StaticParsed = true;
+                        Out += "FRotator(";
+                        ProcessToken();
+                        Out += ", ";
+                        ProcessToken();
+                        Out += ", ";
+                        ProcessToken();
+                        Out += ")";
+                    }
+                    else if (FuncName == "MakeVector")
+                    {
+                        StaticParsed = true;
+                        Out += "FVector(";
+                        ProcessToken();
+                        Out += ", ";
+                        ProcessToken();
+                        Out += ", ";
+                        ProcessToken();
+                        Out += ")";
+                    }
+                    else if (FuncName == "MakeTransform")
+                    {
+                        StaticParsed = true;
+                        Out += "FTransform(";
+                        ProcessToken();
+                        Out += ", ";
+                        ProcessToken();
+                        Out += ", ";
+                        ProcessToken();
+                        Out += ")";
                     }
                 }
 #endif
