@@ -294,8 +294,15 @@ public:
             }
             case EX_StructConst:
             {
-                ReadPtr<UStruct>();
+                auto Struct = ReadPtr<UStruct>();
                 ReadInt32();
+
+                static UStruct* LatentActionInfo = (UStruct*)UObject::FindObject(L"/Script/Engine.LatentActionInfo");
+                if (Struct == LatentActionInfo)
+                {
+                    ScriptIndex++;
+                    Labels[CurrentFunc].push_back(ReadInt32());
+                }
                 while (PreProcessToken() != EX_EndStructConst) { }
                 break;
             }
