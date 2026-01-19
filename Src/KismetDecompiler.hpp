@@ -8,6 +8,18 @@
 // })
 #define FormatMaps 1
 
+// Formats TArray<>
+// Example:
+// TArray<int32>({ 23, 45, 76, 42})
+// to
+// TArray<int32>({
+//     23,
+//     45,
+//     76,
+//     42
+// })
+#define FormatArrays 1
+
 // Parses static funcs such as UKismetMathLibrary::Add_FloatFloat
 // Example:
 // CallFunc_Add_FloatFloat_ReturnValue_1 = UKismetMathLibrary::Add_FloatFloat(localaccumulator.SecondaryDamage_32_EB6925F04B8C5CA1EA314ABBC9C1B68F, CallFunc_SelectFloat_ReturnValue);
@@ -19,7 +31,7 @@
 // Example: 
 // Enabled: int32(12), uint8(2)
 // Disabled: 12, 2
-#define ClearIntegers 1
+#define TypedIntegers 1
 
 class KismetDecompiler
 {
@@ -659,6 +671,112 @@ public:
         return Token;
     }
 
+    // Implementing this for the 4th time !!!
+    template <typename T>
+    T& BaseGetChild(void* Base, int32 Offset)
+    {
+        return *(T*)(int64(Base) + Offset);
+    }
+
+    void ProcessDefault(UnrealProperty* Prop, void* Base, int32 Offset)
+    {
+        if (Prop->HasCastFlag(CASTCLASS_FFloatProperty)) Out += std::format("{:#.0f}f", BaseGetChild<float>(Base, Offset));
+        else if (Prop->HasCastFlag(CASTCLASS_FBoolProperty)) Out += std::format("{}", BaseGetChild<bool>(Base, Offset));
+        else if (Prop->HasCastFlag(CASTCLASS_FInt8Property)) Out += std::format("{}", BaseGetChild<int8>(Base, Offset));
+        else if (Prop->HasCastFlag(CASTCLASS_FInt16Property)) Out += std::format("{}", BaseGetChild<int16>(Base, Offset));
+        else if (Prop->HasCastFlag(CASTCLASS_FIntProperty)) Out += std::format("{}", BaseGetChild<int32>(Base, Offset));
+        else if (Prop->HasCastFlag(CASTCLASS_FInt64Property)) Out += std::format("{}", BaseGetChild<int64>(Base, Offset));
+        else if (Prop->HasCastFlag(CASTCLASS_FUInt16Property)) Out += std::format("{}", BaseGetChild<uint16>(Base, Offset));
+        else if (Prop->HasCastFlag(CASTCLASS_FUInt32Property)) Out += std::format("{}", BaseGetChild<uint32>(Base, Offset));
+        else if (Prop->HasCastFlag(CASTCLASS_FUInt64Property)) Out += std::format("{}", BaseGetChild<uint64>(Base, Offset));
+        else if (Prop->HasCastFlag(CASTCLASS_FNameProperty)) Out += std::format("FName(\"{}\")", BaseGetChild<FName>(Base, Offset).ToString());
+        else if (Prop->HasCastFlag(CASTCLASS_FStrProperty)) Out += std::format("FString(\"{}\")", BaseGetChild<FString>(Base, Offset).ToString());
+        else if (Prop->HasCastFlag(CASTCLASS_FObjectPropertyBase))
+        {
+            auto Obj = BaseGetChild<UObject*>(Base, Offset);
+            if (Obj)
+                Out += std::format("UObject::FindObject(\"{}\")", Obj->GetPathName());
+            else
+                Out += "nullptr";
+        }
+        else if (Prop->HasCastFlag(CASTCLASS_FStructProperty))
+        {
+            auto Struct = (UStruct*)Prop->GetChild<UStruct*>(UnrealOptions::PropSize);
+            Out += std::format("{}({{\n", Struct->GetCPPName());
+            AddIndent();
+            auto Props = Struct->GetProps();
+            for (int i = 0; i < Props.size(); i++)
+            {
+                Indent();
+                Out += std::format("{} = ", Props[i]->GetNameSafe());
+                ProcessDefault(Props[i], Base, Offset + Props[i]->GetOffset());
+                if (i != Props.size() - 1)
+                    Out += ',';
+                Out += '\n';
+            }
+            DropIndent();
+            Indent();
+            Out += "})";
+        }
+        else if (Prop->HasCastFlag(CASTCLASS_FArrayProperty))
+        {
+            auto Arr = BaseGetChild<TArray<uint8>>(Base, Offset);
+            auto ArrProp = Prop->GetChild<UnrealProperty*>(UnrealOptions::PropSize);
+            if (Arr.Num() == 0)
+            {
+                Out += std::format("TArray<{}>()", ArrProp->GetCPPType());
+                return;
+            }
+            Out += std::format("TArray<{}>({{ ", ArrProp->GetCPPType());
+
+#if FormatArrays
+            Out += '\n';
+            AddIndent();
+            Indent();
+#endif
+            for (int i = 0; i < Arr.Num(); i++)
+            {
+                ProcessDefault(ArrProp, Arr.GetData(), i * ArrProp->GetSize());
+                if (i != Arr.Num() - 1)
+                {
+                    Out += ", ";
+#if FormatArrays
+                    Out += "\n";
+                    Indent();
+#endif
+                }
+            }
+#if FormatArrays
+            Out += "\n";
+            DropIndent();
+            Indent();
+#endif
+            Out += "})";
+            // Out += std::format(" /* {} */", ArrProp->GetCPPType());
+            // ret = std::format("TArray<{}>", GetChild<UnrealProperty*>(UnrealOptions::PropSize)->GetCPPType());
+        }
+        else if (Prop->HasCastFlag(CASTCLASS_FByteProperty))
+        {
+            // TODO
+
+            Out += std::format("{}", BaseGetChild<uint8>(Base, Offset));
+        }
+        else
+        {
+            Out += "{/*TODO*/}";
+        }
+    }
+
+    void ProcessDefault(UnrealProperty* Prop)
+    {
+        auto Default = CurrentClass->GetDefaultObject();
+        if (!Default)
+            return;
+
+        Out += " = ";
+        ProcessDefault(Prop, Default, Prop->GetOffset());
+    }
+
     void ProcessMap()
     {
         Out += '{';
@@ -984,7 +1102,7 @@ LetLogic:
             }
             case EX_ByteConst:
             {
-#if ClearIntegers
+#if TypedIntegers
                 Out += std::format("uint8({})", ReadUInt8());
 #else
                 Out += std::format("{}", ReadUInt8());
@@ -993,7 +1111,7 @@ LetLogic:
             }
             case EX_IntConst:
             {
-#if ClearIntegers
+#if TypedIntegers
                 Out += std::format("int32({})", ReadInt32());
 #else
                 Out += std::format("{}", ReadInt32());
@@ -1002,7 +1120,7 @@ LetLogic:
             }
             case EX_Int64Const:
             {
-#if ClearIntegers
+#if TypedIntegers
                 Out += std::format("int64({})", ReadInt64());
 #else
                 Out += std::format("{}", ReadInt64());
@@ -1011,7 +1129,7 @@ LetLogic:
             }
             case EX_UInt64Const:
             {
-#if ClearIntegers
+#if TypedIntegers
                 Out += std::format("uint64({})", ReadUInt64());
 #else
                 Out += std::format("{}", ReadUInt64());
@@ -1159,7 +1277,7 @@ LetLogic:
             }
             case EX_SkipOffsetConst:
             {
-#if ClearIntegers
+#if TypedIntegers
                 Out += std::format("int32({})", ReadInt32());
 #else
                 Out += std::format("{}", ReadInt32());
@@ -1423,7 +1541,10 @@ LetLogic:
         AddIndent();
         for (auto Prop : Class->GetProps(false))
         {
-            OutLine("{} {};", Prop->GetCPPType(), Prop->GetNameSafe());
+            Indent();
+            Out += std::format("{} {}", Prop->GetCPPType(), Prop->GetNameSafe());
+            ProcessDefault(Prop);
+            Out += ";\n";
         }
         OutLine("");
         for (auto Func : Class->GetFuncs(false))

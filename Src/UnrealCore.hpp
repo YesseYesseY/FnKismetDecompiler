@@ -40,6 +40,7 @@ namespace UnrealCore
         static int32 UFunction_FunctionFlags = -1;
 
         static int32 UClass_CastFlags = -1;
+        static int32 UClass_DefaultObject = -1;
     }
 
     namespace UnrealOptions
@@ -539,6 +540,17 @@ namespace UnrealCore
             return *(EPropertyFlags*)(int64(this) + Offsets::UProperty_PropertyFlags);
         }
 
+        int32 GetSize()
+        {
+            if (!this)
+                return 0;
+
+            if (UnrealOptions::FFields)
+                return *(int32*)(int64(this) + Offsets::FProperty_PropertyFlags - 4);
+
+            return *(int32*)(int64(this) + Offsets::UProperty_PropertyFlags - 4);
+        }
+
         bool HasPropertyFlag(EPropertyFlags Flag)
         {
             if (!this)
@@ -678,9 +690,15 @@ namespace UnrealCore
 
     class UClass : public UStruct
     {
+    public:
         EClassCastFlags GetCastFlags()
         {
-            GetChild<EClassCastFlags>(Offsets::UClass_CastFlags);
+            return GetChild<EClassCastFlags>(Offsets::UClass_CastFlags);
+        }
+
+        UObject* GetDefaultObject()
+        {
+            return GetChild<UObject*>(Offsets::UClass_DefaultObject);
         }
     };
 
@@ -967,12 +985,21 @@ namespace UnrealCore
         Offsets::UFunction_FunctionFlags = StructClass->GetSize();
         Offsets::UFunction_ExecFunc = Offsets::UFunction_FunctionFlags + 0x28;
 
+        // Why is UClass so messy :(
         if (EngineVersion >= 5.0f || ClassClass->GetSize() == 0x238)
             Offsets::UClass_CastFlags = StructClass->GetSize() + 0x28;
         else if (EngineVersion >= 4.22f) // TODO Check 4.21
             Offsets::UClass_CastFlags = StructClass->GetSize() + 0x20;
         else
             Offsets::UClass_CastFlags = StructClass->GetSize() + 0x30;
+
+        if (EngineVersion >= 5.0f || ClassClass->GetSize() == 0x238)
+            Offsets::UClass_DefaultObject = Offsets::UClass_CastFlags + 0x40;
+        else if (EngineVersion >= 4.22f) // TODO Check 4.21
+            Offsets::UClass_DefaultObject = Offsets::UClass_CastFlags + 0x48;
+        else
+            Offsets::UClass_DefaultObject = Offsets::UClass_CastFlags + 0x40;
+
 
         UnrealOptions::PropSize = UObject::FindClass(L"/Script/CoreUObject.Property")->GetSize();
 

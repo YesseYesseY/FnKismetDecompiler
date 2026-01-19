@@ -79,10 +79,11 @@ DWORD MainThread(HMODULE Module)
     MessageBox("Finished decompiling all blueprints");
 #else
     // auto Class = UObject::FindClass(L"/Game/Athena/Athena_PlayerController.Athena_PlayerController_C");
-    // auto Class = UObject::FindClass(L"/Game/Athena/PlayerPawn_Athena.PlayerPawn_Athena_C");
+    auto Class = UObject::FindClass(L"/Game/Athena/PlayerPawn_Athena.PlayerPawn_Athena_C");
+    // auto Class = UObject::FindClass(L"/Game/Athena/B_AthenaAlwaysLoadedContentHack.B_AthenaAlwaysLoadedContentHack_C");
     // auto Class = UObject::FindClass(L"/Game/Athena/SupplyDrops/BP_DamageBalloon_Athena.BP_DamageBalloon_Athena_C");
     // auto Class = UObject::FindClass(L"/Game/Athena/DrivableVehicles/Mech/TestMechVehicle.TestMechVehicle_C");
-    auto Class = UObject::FindClass(L"/Game/Athena/Items/EnvironmentalItems/ExplosiveProps/Apollo_GasPump_Valet.Apollo_GasPump_Valet_C");
+    // auto Class = UObject::FindClass(L"/Game/Athena/Items/EnvironmentalItems/ExplosiveProps/Apollo_GasPump_Valet.Apollo_GasPump_Valet_C");
 
 #if 0 // Disassemble or Decompile
     std::ofstream outfile("script.txt");
