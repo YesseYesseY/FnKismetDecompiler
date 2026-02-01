@@ -10,10 +10,10 @@ using namespace UnrealCore;
 
 #define MessageBox(...) MessageBoxA(NULL, std::format(__VA_ARGS__).c_str(), "KismetDecompiler", MB_OK)
 
-#define BR_MAP L"Artemis_Terrain"
+#define BR_MAP L"Athena_Terrain"
 
 #define SEARCH_FOR_UNKNOWNS 0
-#define LOAD_BR_MAP 0
+#define LOAD_BR_MAP 1
 #define DECOMP_ALL_BLUEPRINTS 1
 #define DUMP_OBJECTS 0
 
@@ -78,8 +78,8 @@ DWORD MainThread(HMODULE Module)
     }
     MessageBox("Finished decompiling all blueprints");
 #else
-    // auto Class = UObject::FindClass(L"/Game/Athena/Athena_PlayerController.Athena_PlayerController_C");
-    auto Class = UObject::FindClass(L"/Game/Athena/PlayerPawn_Athena.PlayerPawn_Athena_C");
+    auto Class = UObject::FindClass(L"/Game/Athena/Athena_PlayerController.Athena_PlayerController_C");
+    // auto Class = UObject::FindClass(L"/Game/Athena/PlayerPawn_Athena.PlayerPawn_Athena_C");
     // auto Class = UObject::FindClass(L"/Game/Athena/B_AthenaAlwaysLoadedContentHack.B_AthenaAlwaysLoadedContentHack_C");
     // auto Class = UObject::FindClass(L"/Game/Athena/SupplyDrops/BP_DamageBalloon_Athena.BP_DamageBalloon_Athena_C");
     // auto Class = UObject::FindClass(L"/Game/Athena/DrivableVehicles/Mech/TestMechVehicle.TestMechVehicle_C");

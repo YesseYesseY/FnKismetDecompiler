@@ -173,7 +173,7 @@ public:
     EExprToken PreProcessToken()
     {
         EExprToken Token = (EExprToken)Script[ScriptIndex++];
-        std::println("0x{:X}", (uint8)Token);
+        std::println("Pre: 0x{:X}", (uint8)Token);
         switch (Token)
         {
             case EX_PushExecutionFlow:
@@ -691,7 +691,7 @@ public:
         else if (Prop->HasCastFlag(CASTCLASS_FUInt64Property)) Out += std::format("{}", BaseGetChild<uint64>(Base, Offset));
         else if (Prop->HasCastFlag(CASTCLASS_FNameProperty)) Out += std::format("FName(\"{}\")", BaseGetChild<FName>(Base, Offset).ToString());
         else if (Prop->HasCastFlag(CASTCLASS_FStrProperty)) Out += std::format("FString(\"{}\")", BaseGetChild<FString>(Base, Offset).ToString());
-        else if (Prop->HasCastFlag(CASTCLASS_FObjectPropertyBase))
+        else if (Prop->HasCastFlag(CASTCLASS_FObjectPropertyBase) && !Prop->HasCastFlag(CASTCLASS_FSoftObjectProperty)) // TODO SoftObject
         {
             auto Obj = BaseGetChild<UObject*>(Base, Offset);
             if (Obj)
@@ -813,7 +813,7 @@ public:
     EExprToken ProcessToken(bool CalledFromContext = false)
     {
         EExprToken Token = (EExprToken)Script[ScriptIndex++];
-        std::println("0x{:X}", (uint8)Token);
+        std::println("Main: 0x{:X}", (uint8)Token);
         switch (Token)
         {
             case EX_PushExecutionFlow:
