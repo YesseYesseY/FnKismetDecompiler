@@ -691,13 +691,30 @@ public:
         else if (Prop->HasCastFlag(CASTCLASS_FUInt64Property)) Out += std::format("{}", BaseGetChild<uint64>(Base, Offset));
         else if (Prop->HasCastFlag(CASTCLASS_FNameProperty)) Out += std::format("FName(\"{}\")", BaseGetChild<FName>(Base, Offset).ToString());
         else if (Prop->HasCastFlag(CASTCLASS_FStrProperty)) Out += std::format("FString(\"{}\")", BaseGetChild<FString>(Base, Offset).ToString());
-        else if (Prop->HasCastFlag(CASTCLASS_FObjectPropertyBase) && !Prop->HasCastFlag(CASTCLASS_FSoftObjectProperty)) // TODO SoftObject
+        else if (Prop->HasCastFlag(CASTCLASS_FObjectProperty)) // TODO SoftObject
         {
             auto Obj = BaseGetChild<UObject*>(Base, Offset);
             if (Obj)
                 Out += std::format("UObject::FindObject(\"{}\")", Obj->GetPathName());
             else
                 Out += "nullptr";
+        }
+        else if (Prop->HasCastFlag(CASTCLASS_FSoftObjectProperty))
+        {
+            auto SoftPtr = BaseGetChild<FSoftObjectPtr>(Base, Offset);
+            Out += std::format("TSoftObjectPtr(\"{}\")", SoftPtr.GetPath());
+            
+            // static auto SystemLib = UObject::FindObject(L"/Script/Engine.Default__KismetSystemLibrary");
+            // static auto Func = UObject::FindFunction(L"/Script/Engine.KismetSystemLibrary.Conv_SoftObjectReferenceToString");
+            // struct {
+            //     uint8 softptr[0x28];
+            //     FString Ret;
+            // } args {};
+            // auto Ptr = BaseGetChild<uint8>(Base, Offset);
+            // memcpy(&args.softptr, &Ptr, 0x28);
+            // SystemLib->ProcessEvent(Func, &args);
+            // Out += std::format("TSoftObjectPtr(\"{}\")", args.Ret.ToString());
+            // args.Ret.Free();
         }
         else if (Prop->HasCastFlag(CASTCLASS_FStructProperty))
         {

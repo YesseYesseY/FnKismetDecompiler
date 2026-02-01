@@ -734,6 +734,39 @@ namespace UnrealCore
         }
     };
 
+    struct FWeakObjectPtr
+    {
+        int32 ObjectIndex;
+        int32 ObjectSerialNumber;
+    };
+
+    struct FSoftObjectPath
+    {
+        FName AssetPathName;
+        FString SubPathString;
+    };
+
+    template <typename T>
+    struct TPersistentObjectPtr
+    {
+        FWeakObjectPtr WeakPtr;
+        int32 TagAtLastTest;
+        T ObjectID;
+    };
+
+    struct FSoftObjectPtr : public TPersistentObjectPtr<FSoftObjectPath>
+    {
+        std::string GetPath()
+        {
+            auto ret = ObjectID.AssetPathName.ToString();
+            if (ObjectID.SubPathString.Num() > 1)
+            {
+                ret += std::format(":{}", ObjectID.SubPathString.ToString());
+            }
+            return ret;
+        }
+    };
+
     std::string FName::ToString()
     {
         static auto StringLib = UObject::FindObject(L"/Script/Engine.Default__KismetStringLibrary");
@@ -897,9 +930,13 @@ namespace UnrealCore
             auto Val = GetChild<UnrealProperty*>(UnrealOptions::PropSize + 8);
             ret = std::format("TMap<{}, {}>", Key->GetCPPType(), Val->GetCPPType());
         }
-        else if (HasCastFlag(CASTCLASS_FObjectPropertyBase))
+        else if (HasCastFlag(CASTCLASS_FObjectProperty))
         {
             ret = std::format("{}*", GetChild<UClass*>(UnrealOptions::PropSize)->GetCPPName());
+        }
+        else if (HasCastFlag(CASTCLASS_FSoftObjectProperty))
+        {
+            ret = std::format("TSoftObjectPtr<{}>", GetChild<UClass*>(UnrealOptions::PropSize)->GetCPPName());
         }
         else if (HasCastFlag(CASTCLASS_FByteProperty))
         {

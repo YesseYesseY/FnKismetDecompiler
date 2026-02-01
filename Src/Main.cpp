@@ -13,7 +13,7 @@ using namespace UnrealCore;
 #define BR_MAP L"Athena_Terrain"
 
 #define SEARCH_FOR_UNKNOWNS 0
-#define LOAD_BR_MAP 1
+#define LOAD_BR_MAP 0
 #define DECOMP_ALL_BLUEPRINTS 1
 #define DUMP_OBJECTS 0
 
