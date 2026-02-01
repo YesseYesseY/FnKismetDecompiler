@@ -661,6 +661,42 @@ namespace UnrealCore
             return ret;
         }
 
+        std::vector<std::pair<UStruct*, std::vector<UnrealProperty*>>> GetPropsAdvanced()
+        {
+            std::vector<std::pair<UStruct*, std::vector<UnrealProperty*>>> ret;
+
+            if (UnrealOptions::FFields)
+            {
+                for (auto Struct = this; Struct; Struct = Struct->GetSuperStruct())
+                {
+                    std::pair<UStruct*, std::vector<UnrealProperty*>> toadd;
+                    toadd.first = Struct;
+                    for (auto Child = Struct->GetChildProperties(); Child; Child = Child->GetNext())
+                    {
+                        toadd.second.push_back((UnrealProperty*)Child);
+                    }
+                    ret.push_back(toadd);
+                }
+            }
+            else
+            {
+                static auto PropertyClass = UObject::FindClass(L"/Script/CoreUObject.Property");
+                for (auto Struct = this; Struct; Struct = Struct->GetSuperStruct())
+                {
+                    std::pair<UStruct*, std::vector<UnrealProperty*>> toadd;
+                    toadd.first = Struct;
+                    for (auto Child = Struct->GetChildren(); Child; Child = Child->GetNext())
+                    {
+                        if (Child->IsA(PropertyClass))
+                            toadd.second.push_back((UnrealProperty*)Child);
+                    }
+                    ret.push_back(toadd);
+                }
+            }
+
+            return ret;
+        }
+
         int32 GetChildOffset(const std::string& Name)
         {
             for (auto Prop : GetProps())

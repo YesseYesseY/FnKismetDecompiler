@@ -703,18 +703,6 @@ public:
         {
             auto SoftPtr = BaseGetChild<FSoftObjectPtr>(Base, Offset);
             Out += std::format("TSoftObjectPtr(\"{}\")", SoftPtr.GetPath());
-            
-            // static auto SystemLib = UObject::FindObject(L"/Script/Engine.Default__KismetSystemLibrary");
-            // static auto Func = UObject::FindFunction(L"/Script/Engine.KismetSystemLibrary.Conv_SoftObjectReferenceToString");
-            // struct {
-            //     uint8 softptr[0x28];
-            //     FString Ret;
-            // } args {};
-            // auto Ptr = BaseGetChild<uint8>(Base, Offset);
-            // memcpy(&args.softptr, &Ptr, 0x28);
-            // SystemLib->ProcessEvent(Func, &args);
-            // Out += std::format("TSoftObjectPtr(\"{}\")", args.Ret.ToString());
-            // args.Ret.Free();
         }
         else if (Prop->HasCastFlag(CASTCLASS_FStructProperty))
         {
@@ -782,16 +770,6 @@ public:
         {
             Out += "{/*TODO*/}";
         }
-    }
-
-    void ProcessDefault(UnrealProperty* Prop)
-    {
-        auto Default = CurrentClass->GetDefaultObject();
-        if (!Default)
-            return;
-
-        Out += " = ";
-        ProcessDefault(Prop, Default, Prop->GetOffset());
     }
 
     void ProcessMap()
@@ -1556,12 +1534,41 @@ LetLogic:
 
         Out += std::format("class {} : public {}\n{{\n", Class->GetCPPName(), Class->GetSuperStruct()->GetCPPName());
         AddIndent();
-        for (auto Prop : Class->GetProps(false))
+        auto Things = Class->GetPropsAdvanced();
+        std::reverse(Things.begin(), Things.end());
+        auto MainDefault = CurrentClass->GetDefaultObject();
+        if (MainDefault)
         {
-            Indent();
-            Out += std::format("{} {}", Prop->GetCPPType(), Prop->GetNameSafe());
-            ProcessDefault(Prop);
-            Out += ";\n";
+            for (auto Thing : Things)
+            {
+                auto CmpDefault = ((UClass*)Thing.first)->GetDefaultObject();
+                if (!CmpDefault)
+                    continue;
+
+                Indent();
+                Out += std::format("// {}\n", Thing.first->GetCPPName());
+                for (auto Prop : Thing.second)
+                {
+                    auto PropOffset = Prop->GetOffset();
+
+                    if (MainDefault == CmpDefault)
+                    {
+ProcessTheDefault:
+                        Indent();
+                        Out += std::format("{} {}", Prop->GetCPPType(), Prop->GetNameSafe());
+                        Out += " = ";
+                        ProcessDefault(Prop, MainDefault, PropOffset);
+                        Out += ";\n";
+                    }
+                    else
+                    {
+                        if (Prop->HasPropertyFlag(CPF_IsPlainOldData) && 
+                            memcmp((void*)(int64(MainDefault) + PropOffset), (void*)(int64(CmpDefault) + PropOffset), Prop->GetSize()) != 0)
+                            goto ProcessTheDefault;
+                    }
+                }
+                Out += "\n";
+            }
         }
         OutLine("");
         for (auto Func : Class->GetFuncs(false))
