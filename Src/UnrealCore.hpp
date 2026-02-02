@@ -407,6 +407,24 @@ namespace UnrealCore
 
     class UEnum : public UField
     {
+    public:
+        TArray<TPair<FName, int64>> GetNames()
+        {
+            return GetChild<TArray<TPair<FName, int64>>>(0x40); // the offset is 0x40 for 4.1 to 28.30.
+        }
+
+        std::string GetNameForValue(int64 value)
+        {
+            for (auto Name : GetNames())
+            {
+                if (Name.Value() == value)
+                {
+                    return Name.Key().ToString();
+                }
+            }
+
+            return std::format("{}({})", GetName(), value);
+        }
     };
 
     class UnrealProperty
@@ -803,6 +821,26 @@ namespace UnrealCore
         }
     };
 
+    class FText
+    {
+        uint8 pad[0x18];
+
+    public:
+        std::string ToString()
+        {
+            static auto TextLib = UObject::FindObject(L"/Script/Engine.Default__KismetTextLibrary");
+            static auto Func = UObject::FindFunction(L"/Script/Engine.KismetTextLibrary.Conv_TextToString");
+            struct {
+                FText Text;
+                FString Ret;
+            } args { *this };
+            TextLib->ProcessEvent(Func, &args);
+            auto ret = args.Ret.ToString();
+            args.Ret.Free();
+            return ret;
+        }
+    };
+
     std::string FName::ToString()
     {
         static auto StringLib = UObject::FindObject(L"/Script/Engine.Default__KismetStringLibrary");
@@ -934,6 +972,10 @@ namespace UnrealCore
         else if (HasCastFlag(CASTCLASS_FNameProperty)) ret = "FName";
         else if (HasCastFlag(CASTCLASS_FTextProperty)) ret = "FText";
         else if (HasCastFlag(CASTCLASS_FStrProperty)) ret = "FString";
+        else if (HasCastFlag(CASTCLASS_FEnumProperty))
+        {
+            ret = GetChild<UEnum*>(UnrealOptions::PropSize + 8)->GetName();
+        }
         else if (HasCastFlag(CASTCLASS_FStructProperty))
         {
             ret = GetChild<UStruct*>(UnrealOptions::PropSize)->GetCPPName();
@@ -978,10 +1020,12 @@ namespace UnrealCore
         {
             if (auto Enum = GetChild<UEnum*>(UnrealOptions::PropSize))
             {
-                // TODO
                 ret = Enum->GetName();
             }
-            ret = "uint8";
+            else
+            {
+                ret = "uint8";
+            }
         }
 
         return ret;

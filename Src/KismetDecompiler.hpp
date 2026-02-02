@@ -691,7 +691,21 @@ public:
         else if (Prop->HasCastFlag(CASTCLASS_FUInt64Property)) Out += std::format("{}", BaseGetChild<uint64>(Base, Offset));
         else if (Prop->HasCastFlag(CASTCLASS_FNameProperty)) Out += std::format("FName(\"{}\")", BaseGetChild<FName>(Base, Offset).ToString());
         else if (Prop->HasCastFlag(CASTCLASS_FStrProperty)) Out += std::format("FString(\"{}\")", BaseGetChild<FString>(Base, Offset).ToString());
-        else if (Prop->HasCastFlag(CASTCLASS_FObjectProperty)) // TODO SoftObject
+        else if (Prop->HasCastFlag(CASTCLASS_FTextProperty)) Out += std::format("FText(\"{}\")", BaseGetChild<FText>(Base, Offset).ToString());
+        else if (Prop->HasCastFlag(CASTCLASS_FEnumProperty))
+        {
+            auto Enum = Prop->GetChild<UEnum*>(UnrealOptions::PropSize + 8);
+            auto PropSize = Prop->GetSize();
+
+            int64 Value = 0;
+            if (PropSize <= 1) Value = BaseGetChild<int8>(Base, Offset);
+            else if (PropSize <= 2) Value = BaseGetChild<int16>(Base, Offset);
+            else if (PropSize <= 4) Value = BaseGetChild<int32>(Base, Offset);
+            else if (PropSize <= 8) Value = BaseGetChild<int64>(Base, Offset);
+
+            Out += Enum->GetNameForValue(Value);
+        }
+        else if (Prop->HasCastFlag(CASTCLASS_FObjectProperty))
         {
             auto Obj = BaseGetChild<UObject*>(Base, Offset);
             if (Obj)
@@ -757,14 +771,25 @@ public:
             Indent();
 #endif
             Out += "})";
-            // Out += std::format(" /* {} */", ArrProp->GetCPPType());
-            // ret = std::format("TArray<{}>", GetChild<UnrealProperty*>(UnrealOptions::PropSize)->GetCPPType());
         }
         else if (Prop->HasCastFlag(CASTCLASS_FByteProperty))
         {
-            // TODO
+            if (auto Enum = Prop->GetChild<UEnum*>(UnrealOptions::PropSize))
+            {
+                auto PropSize = Prop->GetSize();
 
-            Out += std::format("{}", BaseGetChild<uint8>(Base, Offset));
+                int64 Value = 0;
+                if (PropSize <= 1) Value = BaseGetChild<int8>(Base, Offset);
+                else if (PropSize <= 2) Value = BaseGetChild<int16>(Base, Offset);
+                else if (PropSize <= 4) Value = BaseGetChild<int32>(Base, Offset);
+                else if (PropSize <= 8) Value = BaseGetChild<int64>(Base, Offset);
+
+                Out += Enum->GetNameForValue(Value);
+            }
+            else
+            {
+                Out += std::format("{}", BaseGetChild<uint8>(Base, Offset));
+            }
         }
         else
         {
@@ -1480,7 +1505,7 @@ LetLogic:
         Indent();
         Out += std::format("{} {}(", rettype, Function->GetNameSafe());
         std::vector<UnrealProperty*> Parms;
-        for (auto Prop : Function->GetProps())
+        for (auto Prop : Function->GetProps(false))
         {
             if (Prop->HasPropertyFlag(CPF_Parm))
             {
@@ -1565,6 +1590,18 @@ ProcessTheDefault:
                         if (Prop->HasPropertyFlag(CPF_IsPlainOldData) && 
                             memcmp((void*)(int64(MainDefault) + PropOffset), (void*)(int64(CmpDefault) + PropOffset), Prop->GetSize()) != 0)
                             goto ProcessTheDefault;
+
+                        if (Prop->HasCastFlag(CASTCLASS_FArrayProperty))
+                        {
+                            auto Arr1 = BaseGetChild<TArray<uint8>>(MainDefault, PropOffset);
+                            auto Arr2 = BaseGetChild<TArray<uint8>>(CmpDefault, PropOffset);
+                            auto ArrProp = Prop->GetChild<UnrealProperty*>(UnrealOptions::PropSize);
+
+                            if (Arr1.Num() != Arr2.Num())
+                                goto ProcessTheDefault;
+
+                            // TODO Check if array contains PlainOldData and check with memcmp?
+                        }
                     }
                 }
                 Out += "\n";
