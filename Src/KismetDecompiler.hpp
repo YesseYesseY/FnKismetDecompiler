@@ -43,6 +43,7 @@ private:
     UFunction* CurrentFunc;
     UClass* CurrentClass;
     std::unordered_map<UFunction*, std::vector<int32>> Labels;
+    bool RemoveSemiColon = false;
 
 public:
     KismetDecompiler()
@@ -995,20 +996,50 @@ public:
             {
                 Out += "if (!";
                 ProcessToken();
-                Out += ") PopExecutionFlow()";
+                Out += ")\n";
+                AddIndent();
+                Indent();
+                Out += "PopExecutionFlow();\n";
+                RemoveSemiColon = true;
+                DropIndent();
                 break;
             }
             case EX_ClassContext:
             case EX_Context:
             case EX_Context_FailSilent: // TODO? Mark as failsilent?
             {
-                ProcessToken();
-                Out += "->";
+                bool UseNormalProcessing = true;
+                if (Script[ScriptIndex] == EX_ObjectConst)
+                {
+                    auto Base = ScriptIndex;
+                    static auto BlueprintFunctionLibrary = UObject::FindClass(L"/Script/Engine.BlueprintFunctionLibrary");
 
-                auto Skip = ReadInt32();
-                auto Field = ReadPtr<UnrealProperty>();
+                    ScriptIndex++;
+                    auto Object = ReadPtr<UObject>();
+                    if (Object->IsA(BlueprintFunctionLibrary))
+                    {
+                        auto Skip = ReadInt32();
+                        auto Field = ReadPtr<UnrealProperty>();
 
-                ProcessToken(true);
+                        ProcessToken();
+                        UseNormalProcessing = false;
+                    }
+
+                    if (UseNormalProcessing)
+                        ScriptIndex = Base;
+                }
+
+                if (UseNormalProcessing)
+                {
+
+                    ProcessToken();
+                    Out += "->";
+
+                    auto Skip = ReadInt32();
+                    auto Field = ReadPtr<UnrealProperty>();
+
+                    ProcessToken(true);
+                }
 
                 break;
             }
@@ -1077,7 +1108,12 @@ LetLogic:
                 auto Skip = ReadInt32();
                 Out += "if (!";
                 ProcessToken();
-                Out += std::format(") goto Label_{}", Skip);
+                Out += ")\n";
+                AddIndent();
+                Indent();
+                Out += std::format("goto Label_{};\n", Skip);
+                RemoveSemiColon = true;
+                DropIndent();
                 break;
             }
             case EX_Return:
@@ -1532,10 +1568,12 @@ LetLogic:
                 Indent();
 
             auto Token = ProcessToken();
-            if (Token != EX_Nothing && Token != EX_EndOfScript)
+            if (!RemoveSemiColon && Token != EX_Nothing && Token != EX_EndOfScript)
                  Out += ';';
             if (Token != EX_EndOfScript)
                 Out += '\n';
+
+            RemoveSemiColon = false;
         }
         DropIndent();
         OutLine("}}");
@@ -1600,7 +1638,10 @@ ProcessTheDefault:
                             if (Arr1.Num() != Arr2.Num())
                                 goto ProcessTheDefault;
 
-                            // TODO Check if array contains PlainOldData and check with memcmp?
+                            // Idk if this works but probably does
+                            if (ArrProp->HasPropertyFlag(CPF_IsPlainOldData) &&
+                                memcmp(Arr1.GetData(), Arr2.GetData(), Arr1.Num() * ArrProp->GetSize()) != 0)
+                                goto ProcessTheDefault;
                         }
                     }
                 }
