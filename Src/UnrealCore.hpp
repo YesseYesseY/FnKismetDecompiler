@@ -1008,6 +1008,18 @@ namespace UnrealCore
             auto Val = GetChild<UnrealProperty*>(UnrealOptions::PropSize + 8);
             ret = std::format("TMap<{}, {}>", Key->GetCPPType(), Val->GetCPPType());
         }
+        else if (HasCastFlag(CASTCLASS_FClassProperty))
+        {
+            auto Meta = GetChild<UClass*>(UnrealOptions::PropSize + 8);
+            if (Meta)
+            {
+                ret = std::format("TSubclassOf<{}>", Meta->GetCPPName());
+            }
+            else
+            {
+                ret = "UClass*";
+            }
+        }
         else if (HasCastFlag(CASTCLASS_FObjectProperty))
         {
             ret = std::format("{}*", GetChild<UClass*>(UnrealOptions::PropSize)->GetCPPName());
