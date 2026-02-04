@@ -947,6 +947,27 @@ public:
                         Out += ")";
                     }
                 }
+                else if (FuncName == "Array_Length")
+                {
+                    StaticParsed = true;
+                    ProcessToken();
+                    Out += ".Num()";
+                }
+                else if (FuncName == "Array_Get")
+                {
+                    StaticParsed = true;
+                    auto Base = ScriptIndex;
+                    PreProcessToken();
+                    PreProcessToken();
+                    ProcessToken();
+                    Out += " = ";
+                    ScriptIndex = Base;
+                    ProcessToken();
+                    Out += '[';
+                    ProcessToken();
+                    Out += ']';
+                    PreProcessToken();
+                }
 #endif
 
                 if (!StaticParsed)
@@ -1012,11 +1033,10 @@ public:
                 if (Script[ScriptIndex] == EX_ObjectConst)
                 {
                     auto Base = ScriptIndex;
-                    static auto BlueprintFunctionLibrary = UObject::FindClass(L"/Script/Engine.BlueprintFunctionLibrary");
 
                     ScriptIndex++;
                     auto Object = ReadPtr<UObject>();
-                    if (Object->IsA(BlueprintFunctionLibrary))
+                    if (Object->IsDefaultObject())
                     {
                         auto Skip = ReadInt32();
                         auto Field = ReadPtr<UnrealProperty>();
