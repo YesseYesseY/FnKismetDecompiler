@@ -1638,8 +1638,7 @@ LetLogic:
                     {
 ProcessTheDefault:
                         Indent();
-                        Out += std::format("{} {}", Prop->GetCPPType(), Prop->GetNameSafe());
-                        Out += " = ";
+                        Out += std::format("{} {} = ", Prop->GetCPPType(), Prop->GetNameSafe());
                         ProcessDefault(Prop, MainDefault, PropOffset);
                         Out += ";\n";
                     }
@@ -1677,6 +1676,21 @@ ProcessTheDefault:
         DropIndent();
         Out += "}";
 
+        return Out;
+    }
+
+    std::string ProcessDataAsset(UObject* Object)
+    {
+        Out += std::format("class {} : public {}\n{{\n", Object->GetNameSafe(), Object->GetClass()->GetCPPName());
+        AddIndent();
+        for (auto Prop : Object->GetClass()->GetProps())
+        {
+            Indent();
+            Out += std::format("{} {} = ", Prop->GetCPPType(), Prop->GetNameSafe());
+            ProcessDefault(Prop, Object, Prop->GetOffset());
+            Out += ";\n";
+        }
+        DropIndent();
         return Out;
     }
 };

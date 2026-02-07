@@ -16,6 +16,7 @@ using namespace UnrealCore;
 #define LOAD_BR_MAP 1
 #define DECOMP_ALL_BLUEPRINTS 1
 #define DUMP_OBJECTS 0
+#define PROCESS_DATA_ASSETS 0 // Warning: Very slow! If you can use FModel just use that instead
 
 #include "KismetDisassembler.hpp"
 #include "KismetDecompiler.hpp"
@@ -31,6 +32,7 @@ DWORD MainThread(HMODULE Module)
     InitUnrealCore();
 
     auto BlueprintGeneratedClassClass = UObject::FindClass(L"/Script/Engine.BlueprintGeneratedClass");
+    auto PrimaryDataAssetClass = UObject::FindClass(L"/Script/Engine.PrimaryDataAsset");
 
     // MessageBox("{}", EngineVersion);
 
@@ -68,13 +70,25 @@ DWORD MainThread(HMODULE Module)
     for (int i = 0; i < UObject::Objects->Num(); i++)
     {
         auto Object = UObject::Objects->GetObject(i);
-        if (Object && Object->IsA(BlueprintGeneratedClassClass))
+
+        if (!Object)
+            continue;
+
+        if (Object->IsA(BlueprintGeneratedClassClass))
         {
             auto Class = (UClass*)Object;
             std::ofstream outfile("decomp/" + Class->GetNameSafe() + ".cpp");
             outfile << KismetDecompiler().Disassemble(Class);
             outfile.close();
         }
+#if PROCESS_DATA_ASSETS
+        else if (Object->IsA(PrimaryDataAssetClass))
+        {
+            std::ofstream outfile("data/" + Object->GetNameSafe() + ".cpp");
+            outfile << KismetDecompiler().ProcessDataAsset(Object);
+            outfile.close();
+        }
+#endif
     }
     MessageBox("Finished decompiling all blueprints");
 #else
