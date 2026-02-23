@@ -33,6 +33,9 @@
 // Disabled: 12, 2
 #define TypedIntegers 1
 
+// Print class props
+#define PrintProps 1
+
 class KismetDecompiler
 {
 private:
@@ -682,7 +685,6 @@ public:
     void ProcessDefault(UnrealProperty* Prop, void* Base, int32 Offset)
     {
         if (Prop->HasCastFlag(CASTCLASS_FFloatProperty)) Out += std::format("{:#.0f}f", BaseGetChild<float>(Base, Offset));
-        else if (Prop->HasCastFlag(CASTCLASS_FBoolProperty)) Out += std::format("{}", BaseGetChild<bool>(Base, Offset));
         else if (Prop->HasCastFlag(CASTCLASS_FInt8Property)) Out += std::format("{}", BaseGetChild<int8>(Base, Offset));
         else if (Prop->HasCastFlag(CASTCLASS_FInt16Property)) Out += std::format("{}", BaseGetChild<int16>(Base, Offset));
         else if (Prop->HasCastFlag(CASTCLASS_FIntProperty)) Out += std::format("{}", BaseGetChild<int32>(Base, Offset));
@@ -693,6 +695,19 @@ public:
         else if (Prop->HasCastFlag(CASTCLASS_FNameProperty)) Out += std::format("FName(\"{}\")", BaseGetChild<FName>(Base, Offset).ToString());
         else if (Prop->HasCastFlag(CASTCLASS_FStrProperty)) Out += std::format("FString(\"{}\")", BaseGetChild<FString>(Base, Offset).ToString());
         else if (Prop->HasCastFlag(CASTCLASS_FTextProperty)) Out += std::format("FText(\"{}\")", BaseGetChild<FText>(Base, Offset).ToString());
+        else if (Prop->HasCastFlag(CASTCLASS_FBoolProperty))
+        {
+            auto FieldMask = Prop->GetChild<uint8>(UnrealOptions::PropSize + 3);
+            bool IsNativeBool = FieldMask == 0xFF;
+            if (IsNativeBool)
+            {
+                Out += std::format("{}", BaseGetChild<bool>(Base, Offset));
+            }
+            else
+            {
+                Out += std::format("{}", (BaseGetChild<uint8>(Base, Offset) & FieldMask) != 0);
+            }
+        }
         else if (Prop->HasCastFlag(CASTCLASS_FEnumProperty))
         {
             auto Enum = Prop->GetChild<UEnum*>(UnrealOptions::PropSize + 8);
@@ -1620,6 +1635,9 @@ LetLogic:
         auto Things = Class->GetPropsAdvanced();
         std::reverse(Things.begin(), Things.end());
         auto MainDefault = CurrentClass->GetDefaultObject();
+#if !PrintProps
+        MainDefault = nullptr;
+#endif
         if (MainDefault)
         {
             for (auto Thing : Things)
@@ -1691,6 +1709,7 @@ ProcessTheDefault:
             Out += ";\n";
         }
         DropIndent();
+        Out += "}";
         return Out;
     }
 };

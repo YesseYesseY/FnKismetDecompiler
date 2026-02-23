@@ -13,10 +13,10 @@ using namespace UnrealCore;
 #define BR_MAP L"Athena_Terrain"
 
 #define SEARCH_FOR_UNKNOWNS 0
-#define LOAD_BR_MAP 1
+#define LOAD_BR_MAP 0
 #define DECOMP_ALL_BLUEPRINTS 1
 #define DUMP_OBJECTS 0
-#define PROCESS_DATA_ASSETS 0 // Warning: Very slow! If you can use FModel just use that instead
+#define PROCESS_DATA_ASSETS 1 // Warning: Very slow! If you can use FModel just use that instead
 
 #include "KismetDisassembler.hpp"
 #include "KismetDecompiler.hpp"

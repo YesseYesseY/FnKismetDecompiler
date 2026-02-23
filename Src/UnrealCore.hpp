@@ -982,17 +982,17 @@ namespace UnrealCore
         }
         else if (HasCastFlag(CASTCLASS_FBoolProperty))
         {
-            auto FieldMask = GetChild<uint8>(UnrealOptions::PropSize + 3);
-            bool IsNativeBool = FieldMask == 0xFF;
-            if (IsNativeBool)
-            {
-                ret = "bool";
-            }
-            else
-            {
-                // TODO
-                ret = "bool /*TODO*/";
-            }
+            ret = "bool";
+            // auto FieldMask = GetChild<uint8>(UnrealOptions::PropSize + 3);
+            // bool IsNativeBool = FieldMask == 0xFF;
+            // if (IsNativeBool)
+            // {
+            //     ret = "bool";
+            // }
+            // else
+            // {
+            //     ret = "bool /* bit */";
+            // }
         }
         else if (HasCastFlag(CASTCLASS_FArrayProperty))
         {
