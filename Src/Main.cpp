@@ -10,13 +10,19 @@ using namespace UnrealCore;
 
 #define MessageBox(...) MessageBoxA(NULL, std::format(__VA_ARGS__).c_str(), "KismetDecompiler", MB_OK)
 
+#define FNVER 851
+#if FNVER == 1940
+#define BR_MAP L"Artemis_Terrain"
+#define REQEXIT 0x15F7BDC
+#else // Athena_Terrain doesn't crash like the other maps so it's fine to default to it
 #define BR_MAP L"Athena_Terrain"
+#endif
 
 #define SEARCH_FOR_UNKNOWNS 0
-#define LOAD_BR_MAP 0
+#define LOAD_BR_MAP 1
 #define DECOMP_ALL_BLUEPRINTS 1
 #define DUMP_OBJECTS 0
-#define PROCESS_DATA_ASSETS 1 // Warning: Very slow! If you can use FModel just use that instead
+#define PROCESS_DATA_ASSETS 0 // Warning: Very slow! If you can use FModel just use that instead // wine has now stopped crashing FModel so this is basically useless
 
 #include "KismetDisassembler.hpp"
 #include "KismetDecompiler.hpp"
@@ -35,6 +41,14 @@ DWORD MainThread(HMODULE Module)
     auto PrimaryDataAssetClass = UObject::FindClass(L"/Script/Engine.PrimaryDataAsset");
 
     // MessageBox("{}", EngineVersion);
+
+#ifdef REQEXIT
+    DWORD yes;
+    auto PatchAddr = (uintptr_t)GetModuleHandleW(NULL) + REQEXIT;
+    VirtualProtect((LPVOID)PatchAddr, 1, PAGE_EXECUTE_READWRITE, &yes);
+    *(uint8*)(PatchAddr) = 0xC3;
+    VirtualProtect((LPVOID)PatchAddr, 1, yes, &yes);
+#endif
 
 #if LOAD_BR_MAP
     auto SystemLib = UObject::FindObject(L"/Script/Engine.Default__KismetSystemLibrary");

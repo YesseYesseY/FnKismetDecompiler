@@ -1075,6 +1075,8 @@ namespace UnrealCore
             Ver.Free();
             EngineVersion = std::stof(VerStr);
             GameVersion = std::stof(VerStr.substr(VerStr.find_last_of('-') + 1));
+            if (VerStr.starts_with("4.26.1"))
+                EngineVersion = 4.261f;
         }
 
         if (GameVersion >= 19.0f)
@@ -1122,13 +1124,28 @@ namespace UnrealCore
         else
             Offsets::UClass_CastFlags = StructClass->GetSize() + 0x30;
 
-        if (EngineVersion >= 5.0f || ClassClass->GetSize() == 0x238)
-            Offsets::UClass_DefaultObject = Offsets::UClass_CastFlags + 0x40;
-        else if (EngineVersion >= 4.22f) // TODO Check 4.21
+        // 19.40 (ue5.0) = 0x40
+        // 18.40 (ue4.26.1) = 0x40
+        // 14.60 (ue4.26) = 0x48
+        // 12.41 (ue4.25) = 0x48
+        // ????? (ue4.24) = ????
+        // 10.40 (ue4.23) = 0x40
+        // 7.30  (ue4.22) = 0x48
+        // ????  (ue4.21) = ????
+        // 4.1   (ue4.20) = 0x40
+#if 1
+        if (EngineVersion == 4.22f || EngineVersion == 4.25f || EngineVersion == 4.26f)
             Offsets::UClass_DefaultObject = Offsets::UClass_CastFlags + 0x48;
         else
             Offsets::UClass_DefaultObject = Offsets::UClass_CastFlags + 0x40;
-
+#else
+        if (EngineVersion >= 5.0f || ClassClass->GetSize() == 0x238)
+            Offsets::UClass_DefaultObject = Offsets::UClass_CastFlags + 0x40;
+        else if (EngineVersion >= 4.25f) // TODO Check 4.21
+            Offsets::UClass_DefaultObject = Offsets::UClass_CastFlags + 0x48;
+        else
+            Offsets::UClass_DefaultObject = Offsets::UClass_CastFlags + 0x40;
+#endif
 
         UnrealOptions::PropSize = UObject::FindClass(L"/Script/CoreUObject.Property")->GetSize();
 
