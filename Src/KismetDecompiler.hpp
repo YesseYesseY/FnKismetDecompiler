@@ -98,7 +98,7 @@ public:
         return ReadBasic<float>();
     }
 
-    float ReadDouble()
+    double ReadDouble()
     {
         return ReadBasic<double>();
     }
@@ -483,6 +483,7 @@ public:
                 break;
             }
             case EX_InterfaceToObjCast:
+            case EX_CrossInterfaceCast:
             case EX_ObjToInterfaceCast:
             {
                 ReadPtr<UClass>();
@@ -668,6 +669,7 @@ public:
             }
             default:
             {
+                MessageBox("Unknown: 0x{:02X}", (uint8)Token);
                 break;
             }
         }
@@ -685,6 +687,7 @@ public:
     void ProcessDefault(UnrealProperty* Prop, void* Base, int32 Offset)
     {
         if (Prop->HasCastFlag(CASTCLASS_FFloatProperty)) Out += std::format("{:#.0f}f", BaseGetChild<float>(Base, Offset));
+        else if (Prop->HasCastFlag(CASTCLASS_FDoubleProperty)) Out += std::format("{:#.0f}d", BaseGetChild<double>(Base, Offset));
         else if (Prop->HasCastFlag(CASTCLASS_FInt8Property)) Out += std::format("{}", BaseGetChild<int8>(Base, Offset));
         else if (Prop->HasCastFlag(CASTCLASS_FInt16Property)) Out += std::format("{}", BaseGetChild<int16>(Base, Offset));
         else if (Prop->HasCastFlag(CASTCLASS_FIntProperty)) Out += std::format("{}", BaseGetChild<int32>(Base, Offset));
@@ -1332,6 +1335,12 @@ LetLogic:
                 Out += ')';
                 break;
             }
+            case EX_CrossInterfaceCast:
+            {
+                Out += std::format("(I{})", ReadPtr<UClass>()->GetNameSafe());
+                ProcessToken();
+                break;
+            }
             case EX_ArrayConst:
             {
                 auto Prop = ReadPtr<UnrealProperty>();
@@ -1552,10 +1561,10 @@ LetLogic:
             }
             default:
             {
-#ifdef SEARCH_FOR_UNKNOWNS
+#if SEARCH_FOR_UNKNOWNS
                 MessageBox("UNKNOWN AT {}", CurrentFunc->GetFullName());
 #endif
-                OutLine("Unknown: 0x{:02X}", (uint8)Token);
+                MessageBox("Unknown: 0x{:02X}", (uint8)Token);
                 ScriptIndex = Script.Num(); // Skip it all to try avoid crashes (will prob still crash)
                 break;
             }

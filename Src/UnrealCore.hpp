@@ -48,6 +48,7 @@ namespace UnrealCore
         static bool ChunkedObjectArray = false;
         static bool FFields = false;
         static bool Doubles = false;
+        static bool ShortName = false;
         static std::wstring BRMap = L"Athena_Terrain";
         static int32 PropSize = -1;
     }
@@ -200,6 +201,9 @@ namespace UnrealCore
                 if (!Addr) // 19.40
                     Addr = Memcury::Scanner::FindPattern("48 89 5C 24 ? 48 89 74 24 ? 4C 89 64 24 ? 55 41 55 41 57 48 8B EC 48 83 EC 50 4C 8B E9").Get();
 
+                if (!Addr) // 20.40
+                    Addr = Memcury::Scanner::FindPattern("48 89 5C 24 ? 48 89 74 24 ? 4C 89 64 24 ? 55 41 55 41 57 48 8B EC 48 83 EC 60").Get();
+
                 if (!Addr) // 4.1 to 14.60
                     Addr = Memcury::Scanner::FindStringRef(L"Illegal call to StaticFindObject() while serializing object data!").ScanFor({ 0x48, 0x89, 0x5C }, false).Get();
 
@@ -218,6 +222,9 @@ namespace UnrealCore
                 if (!Addr) // 19.40
                     Addr = Memcury::Scanner::FindPattern("40 55 53 56 57 41 54 41 56 41 57 48 81 EC F0 00 00 00").Get();
 
+                if (!Addr) // 20.40
+                    Addr = Memcury::Scanner::FindPattern("40 55 56 57 41 54 41 55 41 56 41 57 48 81 EC 30 01 00 00").Get();
+
                 CheckAddr("Failed to find ProcessEvent");
 
                 ProcessEventNative = decltype(ProcessEventNative)(Addr);
@@ -228,7 +235,7 @@ namespace UnrealCore
                 // 4.1
                 auto Addr = Memcury::Scanner::FindPattern("48 8B 05 ? ? ? ? 48 8D 0C 49 48 8D 14 C8 EB ? 48 8B D3 8B 42 ? C1 E8 1D A8 01 74").RelativeOffset(3).Get();
 
-                if (!Addr) // 7.30 and 18.40  -  Can be used for 4.1 aswell if scanning for 48 8B 0D
+                if (!Addr) // 7.30 to 26.30  -  Can be used for 4.1 aswell if scanning for 48 8B 0D
                     Addr = Memcury::Scanner::FindStringRef(L"Material=").ScanFor({ 0x48, 0x8B, 0x05 }).RelativeOffset(3).Get();
 
                 // if (!Addr)
@@ -1053,7 +1060,10 @@ namespace UnrealCore
             // 4.1
             auto Addr = Memcury::Scanner::FindPattern("4C 8B D1 48 8B 0D ? ? ? ? 48 85 C9 75 ? 49 8B CA").GetAs<void*>();
 
-            if (!Addr)
+            if (!Addr) // 20.40
+                Addr = Memcury::Scanner::FindPattern("48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC 20 48 8B F1 41 8B D8 48 8B 0D ? ? ? ? 48 8B FA").GetAs<void*>();
+
+            if (!Addr) // Honestly forgot
                 Addr = Memcury::Scanner::FindPattern("48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC 20 48 8B F1 41 8B D8 48 8B 0D ? ? ? ? E8").GetAs<void*>();
 
             if (!Addr) // 7.30
@@ -1071,12 +1081,12 @@ namespace UnrealCore
             FString Ver;
             SystemLib->ProcessEvent(Func, &Ver);
             auto VerStr = Ver.ToString();
-            // UnrealMessageBox("{}", VerStr);
             Ver.Free();
             EngineVersion = std::stof(VerStr);
             GameVersion = std::stof(VerStr.substr(VerStr.find_last_of('-') + 1));
             if (VerStr.starts_with("4.26.1"))
                 EngineVersion = 4.261f;
+            // UnrealMessageBox("{}\n{}", EngineVersion, GameVersion);
         }
 
         if (GameVersion >= 19.0f)
@@ -1086,12 +1096,13 @@ namespace UnrealCore
 
         UnrealOptions::ChunkedObjectArray = EngineVersion >= 4.22f; // TODO Check 4.21
         UnrealOptions::FFields = EngineVersion >= 4.25f;
-        UnrealOptions::Doubles = GameVersion >= 20.0f;
+        UnrealOptions::Doubles = GameVersion >= 21.0f; // FUN FACT: 20.40 uses doubles for FVector, FRotator, etc. BUT in kismet script gets stored as floats!!! There goes an hour of my life!
+        UnrealOptions::ShortName = GameVersion >= 20.0f; // Idk when it happened, probably 20.00
 
         Offsets::UObject_ObjectFlags = 0x8;
         Offsets::UObject_Class = 0x10;
         Offsets::UObject_NamePrivate = 0x18;
-        Offsets::UObject_Outer = 0x20;
+        Offsets::UObject_Outer = 0x20; // Even tho FName gets shorter eventually, it pads out to always be these offsets
 
         Offsets::UField_Next = 0x28;
 
@@ -1134,7 +1145,9 @@ namespace UnrealCore
         // ????  (ue4.21) = ????
         // 4.1   (ue4.20) = 0x40
 #if 1
-        if (EngineVersion == 4.22f || EngineVersion == 4.25f || EngineVersion == 4.26f)
+        if (GameVersion > 19.40f)
+            Offsets::UClass_DefaultObject = Offsets::UClass_CastFlags + 0x38;
+        else if (EngineVersion == 4.22f || EngineVersion == 4.25f || EngineVersion == 4.26f)
             Offsets::UClass_DefaultObject = Offsets::UClass_CastFlags + 0x48;
         else
             Offsets::UClass_DefaultObject = Offsets::UClass_CastFlags + 0x40;
@@ -1157,10 +1170,10 @@ namespace UnrealCore
 
             Offsets::FFieldClass_CastFlags = 0x10;
 
-            Offsets::FProperty_PropertyFlags = 0x40;
+            Offsets::FProperty_PropertyFlags = UnrealOptions::ShortName ? 0x38 : 0x40;
             Offsets::FProperty_Offset = Offsets::FProperty_PropertyFlags + 0xC;
 
-            UnrealOptions::PropSize = 0x78;
+            UnrealOptions::PropSize = UnrealOptions::ShortName ? 0x70 : 0x78;
         }
     }
 }

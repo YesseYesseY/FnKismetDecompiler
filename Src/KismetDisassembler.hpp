@@ -144,7 +144,8 @@ struct FScriptName
     {
         FName name;
         name.ComparisonIndex = ComparisonIndex;
-        name.Number = Number;
+        if (!UnrealOptions::ShortName)
+            name.Number = Number;
         return name.ToString();
     }
 };
