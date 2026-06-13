@@ -759,7 +759,7 @@ public:
         else if (Prop->HasCastFlag(CASTCLASS_FArrayProperty))
         {
             auto Arr = BaseGetChild<TArray<uint8>>(Base, Offset);
-            auto ArrProp = Prop->GetChild<UnrealProperty*>(UnrealOptions::PropSize);
+            auto ArrProp = Prop->GetChild<UnrealProperty*>(UnrealOptions::PropSize + (UnrealOptions::ArrayThing ? 8 : 0));
             if (Arr.Num() == 0)
             {
                 Out += std::format("TArray<{}>()", ArrProp->GetCPPType());
@@ -894,6 +894,14 @@ public:
                 // UKismetMathLibrary::Conv_*
 
 #define BasicStaticMathOp(Operation) { StaticParsed = true; ProcessToken(); Out += " " Operation " "; ProcessToken(); }
+
+                if (!Func) // wtf
+                {
+                    Out += "NullFunc(";
+                    ArgsLoop();
+                    Out += ")";
+                    break;
+                }
 
                 static auto MathLibClass = UObject::FindClass(L"/Script/Engine.KismetMathLibrary");
                 auto FuncName = Func->GetNameSafe();
@@ -1679,7 +1687,7 @@ ProcessTheDefault:
                         {
                             auto Arr1 = BaseGetChild<TArray<uint8>>(MainDefault, PropOffset);
                             auto Arr2 = BaseGetChild<TArray<uint8>>(CmpDefault, PropOffset);
-                            auto ArrProp = Prop->GetChild<UnrealProperty*>(UnrealOptions::PropSize);
+                            auto ArrProp = Prop->GetChild<UnrealProperty*>(UnrealOptions::PropSize + (UnrealOptions::ArrayThing ? 8 : 0));
 
                             if (Arr1.Num() != Arr2.Num())
                                 goto ProcessTheDefault;

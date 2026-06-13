@@ -49,6 +49,7 @@ namespace UnrealCore
         static bool FFields = false;
         static bool Doubles = false;
         static bool ShortName = false;
+        static bool ArrayThing = false;
         static std::wstring BRMap = L"Athena_Terrain";
         static int32 PropSize = -1;
     }
@@ -204,6 +205,9 @@ namespace UnrealCore
                 if (!Addr) // 20.40
                     Addr = Memcury::Scanner::FindPattern("48 89 5C 24 ? 48 89 74 24 ? 4C 89 64 24 ? 55 41 55 41 57 48 8B EC 48 83 EC 60").Get();
 
+                if (!Addr) // 24.40
+                    Addr = Memcury::Scanner::FindPattern("48 89 5C 24 ? 48 89 74 24 ? 48 89 7C 24 ? 55 41 56 41 57 48 8B EC 48 83 EC 60 33 DB 4C 8B F9").Get();
+
                 if (!Addr) // 4.1 to 14.60
                     Addr = Memcury::Scanner::FindStringRef(L"Illegal call to StaticFindObject() while serializing object data!").ScanFor({ 0x48, 0x89, 0x5C }, false).Get();
 
@@ -224,6 +228,9 @@ namespace UnrealCore
 
                 if (!Addr) // 20.40
                     Addr = Memcury::Scanner::FindPattern("40 55 56 57 41 54 41 55 41 56 41 57 48 81 EC 30 01 00 00").Get();
+
+                if (!Addr) // 24.40
+                    Addr = Memcury::Scanner::FindPattern("40 55 56 57 41 54 41 55 41 56 41 57 48 81 EC 10 01 00 00 48 8D 6C 24 ? 48 89 9D ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C5 48 89 85 ? ? ? ? 45 33 F6").Get();
 
                 CheckAddr("Failed to find ProcessEvent");
 
@@ -487,7 +494,9 @@ namespace UnrealCore
             if (UnrealOptions::FFields)
             {
                 auto Class = *(void**)(int64(this) + Offsets::FField_Class);
-                auto name = *(FName*)(int64(Class));
+                if (!Class)
+                    return "None";
+                auto name = *(FName*)(Class);
                 return name.ToString();
             }
 
@@ -1003,7 +1012,7 @@ namespace UnrealCore
         }
         else if (HasCastFlag(CASTCLASS_FArrayProperty))
         {
-            ret = std::format("TArray<{}>", GetChild<UnrealProperty*>(UnrealOptions::PropSize)->GetCPPType());
+            ret = std::format("TArray<{}>", GetChild<UnrealProperty*>(UnrealOptions::PropSize + (UnrealOptions::ArrayThing ? 8 : 0))->GetCPPType());
         }
         else if (HasCastFlag(CASTCLASS_FSetProperty))
         {
@@ -1060,7 +1069,7 @@ namespace UnrealCore
             // 4.1
             auto Addr = Memcury::Scanner::FindPattern("4C 8B D1 48 8B 0D ? ? ? ? 48 85 C9 75 ? 49 8B CA").GetAs<void*>();
 
-            if (!Addr) // 20.40
+            if (!Addr) // 20.40, 24.40
                 Addr = Memcury::Scanner::FindPattern("48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC 20 48 8B F1 41 8B D8 48 8B 0D ? ? ? ? 48 8B FA").GetAs<void*>();
 
             if (!Addr) // Honestly forgot
@@ -1086,6 +1095,8 @@ namespace UnrealCore
             GameVersion = std::stof(VerStr.substr(VerStr.find_last_of('-') + 1));
             if (VerStr.starts_with("4.26.1"))
                 EngineVersion = 4.261f;
+            else if (VerStr.starts_with("5.1.1"))
+                EngineVersion = 5.11f;
             // UnrealMessageBox("{}\n{}", EngineVersion, GameVersion);
         }
 
@@ -1098,6 +1109,7 @@ namespace UnrealCore
         UnrealOptions::FFields = EngineVersion >= 4.25f;
         UnrealOptions::Doubles = GameVersion >= 21.0f; // FUN FACT: 20.40 uses doubles for FVector, FRotator, etc. BUT in kismet script gets stored as floats!!! There goes an hour of my life!
         UnrealOptions::ShortName = GameVersion >= 20.0f; // Idk when it happened, probably 20.00
+        UnrealOptions::ArrayThing = EngineVersion >= 5.11f;
 
         Offsets::UObject_ObjectFlags = 0x8;
         Offsets::UObject_Class = 0x10;
@@ -1164,8 +1176,10 @@ namespace UnrealCore
 
         if (UnrealOptions::FFields)
         {
+            bool ShortVariant = EngineVersion >= 5.1f; // Idk when this happened
+
             Offsets::FField_Class = 0x8;
-            Offsets::FField_Next = 0x20;
+            Offsets::FField_Next = ShortVariant ? 0x18 : 0x20;
             Offsets::FField_Name = Offsets::FField_Next + 0x8;
 
             Offsets::FFieldClass_CastFlags = 0x10;
@@ -1174,6 +1188,13 @@ namespace UnrealCore
             Offsets::FProperty_Offset = Offsets::FProperty_PropertyFlags + 0xC;
 
             UnrealOptions::PropSize = UnrealOptions::ShortName ? 0x70 : 0x78;
+
+            if (ShortVariant)
+            {
+                Offsets::FProperty_PropertyFlags -= 8;
+                Offsets::FProperty_Offset -= 8;
+                UnrealOptions::PropSize -= 8;
+            }
         }
     }
 }
