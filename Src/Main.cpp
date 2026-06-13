@@ -10,7 +10,7 @@ using namespace UnrealCore;
 
 #define MessageBox(...) MessageBoxA(NULL, std::format(__VA_ARGS__).c_str(), "KismetDecompiler", MB_OK)
 
-#define FNVER 2440
+#define FNVER 2630
 #if FNVER == 1940
 #define BR_MAP L"Artemis_Terrain"
 #define REQEXIT 0x15F7BDC
@@ -20,6 +20,9 @@ using namespace UnrealCore;
 #elif FNVER == 2440 // NOTE: When injecting on any builds ch4+ you should inject it with a playlist loaded instead
 #define BR_MAP L"Asteria_Terrain"
 #define REQEXIT 0x193E6EC
+#elif FNVER == 2630
+#define BR_MAP L"Asteria_Terrain"
+#define REQEXIT 0x31E946C
 #else // Athena_Terrain doesn't crash like the other maps so it's fine to default to it
 #define BR_MAP L"Athena_Terrain"
 #endif

@@ -191,6 +191,7 @@ public:
                 PreProcessToken();
                 break;
             }
+            case EX_ClassSparseDataVariable:
             case EX_LocalVariable:
             {
                 ReadPtr<UnrealProperty>();
@@ -254,6 +255,12 @@ public:
             }
             case EX_True:
             {
+                break;
+            }
+            case EX_BitFieldConst:
+            {
+                ReadPtr<UnrealProperty>();
+                ReadUInt8();
                 break;
             }
             case EX_CallMulticastDelegate:
@@ -871,6 +878,7 @@ public:
             case EX_DefaultVariable:
             case EX_LocalOutVariable:
             case EX_InstanceVariable:
+            case EX_ClassSparseDataVariable:
             case EX_LocalVariable:
             {
                 auto Prop = ReadPtr<UnrealProperty>();
@@ -1565,6 +1573,13 @@ LetLogic:
             }
             case EX_EndMapConst:
             {
+                break;
+            }
+            case EX_BitFieldConst:
+            {
+                ReadPtr<UnrealProperty>();
+
+                Out += std::format("0b{:b}", ReadUInt8());
                 break;
             }
             default:

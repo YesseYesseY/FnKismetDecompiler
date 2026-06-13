@@ -205,6 +205,9 @@ namespace UnrealCore
                 if (!Addr) // 20.40
                     Addr = Memcury::Scanner::FindPattern("48 89 5C 24 ? 48 89 74 24 ? 4C 89 64 24 ? 55 41 55 41 57 48 8B EC 48 83 EC 60").Get();
 
+                if (!Addr) // 26.30 // Needs to be before 24.40
+                    Addr = Memcury::Scanner::FindPattern("48 89 74 24 ? 48 89 7C 24 ? 55 41 54 41 55 41 56 41 57 48 8B EC 48 83 EC 60 4C 8B E9 48 8D 4D").Get();
+
                 if (!Addr) // 24.40
                     Addr = Memcury::Scanner::FindPattern("48 89 5C 24 ? 48 89 74 24 ? 48 89 7C 24 ? 55 41 56 41 57 48 8B EC 48 83 EC 60 33 DB 4C 8B F9").Get();
 
@@ -231,6 +234,9 @@ namespace UnrealCore
 
                 if (!Addr) // 24.40
                     Addr = Memcury::Scanner::FindPattern("40 55 56 57 41 54 41 55 41 56 41 57 48 81 EC 10 01 00 00 48 8D 6C 24 ? 48 89 9D ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C5 48 89 85 ? ? ? ? 45 33 F6").Get();
+
+                if (!Addr) // 26.30
+                    Addr = Memcury::Scanner::FindPattern("40 55 56 57 41 54 41 55 41 56 41 57 48 81 EC 20 01 00 00 48 8D 6C 24 ? 48 89 9D ? ? ? ? 48 8B 05").Get();
 
                 CheckAddr("Failed to find ProcessEvent");
 
@@ -1069,7 +1075,7 @@ namespace UnrealCore
             // 4.1
             auto Addr = Memcury::Scanner::FindPattern("4C 8B D1 48 8B 0D ? ? ? ? 48 85 C9 75 ? 49 8B CA").GetAs<void*>();
 
-            if (!Addr) // 20.40, 24.40
+            if (!Addr) // 20.40, 24.40, 26.30
                 Addr = Memcury::Scanner::FindPattern("48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC 20 48 8B F1 41 8B D8 48 8B 0D ? ? ? ? 48 8B FA").GetAs<void*>();
 
             if (!Addr) // Honestly forgot
